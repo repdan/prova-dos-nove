@@ -112,6 +112,17 @@ custos:
   slippage_indice: 0.5         # derrapagem estimada por ponta, em pontos de indice
   tamanho_contrato: 1.0
 
+  # SWAP - custo de carregar a posicao de um dia para o outro.
+  # Lido do MT5 em 02/09/2026 (swap_mode = 1, ou seja, em points de 0.01):
+  #   swap_long = -550 points  -> -5.50 pontos de indice por noite, por lote
+  #   swap_short = +3.05       -> +0.03 pontos de indice por noite, por lote
+  # Uma noite comprado custa MAIS que o spread inteiro. Ignorar isso faz o
+  # backtest premiar posicao overnight de graca, que foi exatamente o erro da
+  # primeira rodada da Etapa 3.
+  swap_compra_indice: -5.50
+  swap_venda_indice: 0.03
+  dia_swap_triplo: 4           # 0=segunda ... 4=sexta (MT5: rollover3days=5=sexta)
+
 # -----------------------------------------------------------------------------
 # BACKTEST
 # -----------------------------------------------------------------------------

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from strategy.base import Candle, Direcao, Posicao
@@ -45,6 +45,8 @@ class Trade:
 
     excursao_favoravel: float     # o quanto chegou a ganhar antes de fechar
     excursao_contraria: float     # o quanto chegou a perder (perda maxima)
+    noites_carregadas: int = 0
+    swap_pontos: float = 0.0
 
     contexto: dict[str, Any] = field(default_factory=dict)
 
@@ -73,13 +75,42 @@ class ExecutorSimulado(Executor):
 
     def __init__(self, spread_padrao: float, slippage: float,
                  comissao_por_lote: float, valor_ponto_por_lote: float,
-                 usar_spread_do_candle: bool = True):
+                 usar_spread_do_candle: bool = True,
+                 swap_compra: float = 0.0, swap_venda: float = 0.0,
+                 dia_swap_triplo: int = 4):
         self.spread_padrao = spread_padrao
         self.slippage = slippage
         self.comissao_por_lote = comissao_por_lote
         self.valor_ponto_por_lote = valor_ponto_por_lote
         self.usar_spread_do_candle = usar_spread_do_candle
+        self.swap_compra = swap_compra
+        self.swap_venda = swap_venda
+        self.dia_swap_triplo = dia_swap_triplo
         self.trades: list[Trade] = []
+
+    def _swap(self, posicao: Posicao, saida: datetime) -> tuple[int, float]:
+        """(noites carregadas, custo em pontos).
+
+        Cada virada de data entre entrada e saida e uma noite cobrada. Na
+        sexta o swap e triplo, porque a corretora cobra o fim de semana junto -
+        e trades de rompimento em tendencia costumam ser justamente os que
+        atravessam varios dias.
+        """
+        taxa = (self.swap_compra if posicao.direcao is Direcao.COMPRADO
+                else self.swap_venda)
+        if not taxa:
+            return 0, 0.0
+
+        d0, d1 = posicao.tempo_entrada.date(), saida.date()
+        noites = (d1 - d0).days
+        if noites <= 0:
+            return 0, 0.0
+
+        total = 0.0
+        for k in range(noites):
+            dia = d0 + timedelta(days=k)
+            total += taxa * (3 if dia.weekday() == self.dia_swap_triplo else 1)
+        return noites, total
 
     # ------------------------------------------------------------- custos
 
@@ -157,7 +188,9 @@ class ExecutorSimulado(Executor):
         if self.valor_ponto_por_lote > 0:
             comissao_pontos = self.comissao_por_lote / self.valor_ponto_por_lote
 
-        pontos_liquidos = pontos - comissao_pontos
+        noites, swap_pontos = self._swap(posicao, candle.tempo)
+        # swap negativo e custo; a soma abaixo ja tem o sinal certo.
+        pontos_liquidos = pontos - comissao_pontos + swap_pontos
         mult = posicao.direcao.multiplicador
 
         trade = Trade(
@@ -177,6 +210,8 @@ class ExecutorSimulado(Executor):
             resultado_dinheiro=pontos_liquidos * self.valor_ponto_por_lote * posicao.lote,
             excursao_favoravel=(posicao.estado["melhor"] - bruto_entrada) * mult,
             excursao_contraria=(bruto_entrada - posicao.estado["pior"]) * mult,
+            noites_carregadas=noites,
+            swap_pontos=swap_pontos,
             contexto=posicao.contexto_entrada,
         )
         self.trades.append(trade)

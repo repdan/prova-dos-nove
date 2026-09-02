@@ -58,7 +58,8 @@ class Motor:
                  minutos_por_candle: int = 15,
                  fechar_no_fim_do_pregao: bool = False,
                  stop_catastrofico_ativo: bool = False,
-                 stop_catastrofico_atr: float = 3.0):
+                 stop_catastrofico_atr: float = 3.0,
+                 permitir_simultaneas: bool = False):
         self.estrategia = estrategia
         self.executor = executor
         self.contexto = contexto
@@ -67,6 +68,10 @@ class Motor:
         self.fechar_no_fim_do_pregao = fechar_no_fim_do_pregao
         self.stop_catastrofico_ativo = stop_catastrofico_ativo
         self.stop_catastrofico_atr = stop_catastrofico_atr
+        # Com posicoes simultaneas o motor deixa de simular uma conta e passa a
+        # simular cada sinal isoladamente. Util para pesquisa, invalido para
+        # medir patrimonio - por isso e explicito e nunca o padrao.
+        self.permitir_simultaneas = permitir_simultaneas
 
     def rodar(self, feed: DataFeed) -> ResultadoBacktest:
         resultado = ResultadoBacktest(parametros={
@@ -80,7 +85,7 @@ class Motor:
             "feed": feed.descricao,
         })
 
-        posicao = None
+        abertas: list = []
         candle_anterior: Candle | None = None
 
         for candle in feed:
@@ -89,29 +94,32 @@ class Motor:
             if self.contexto is not None:
                 self.contexto.observar(candle)
 
-            # --- virada de pregao: fecha a posicao antes de o dia mudar ---
-            if (posicao is not None and self.fechar_no_fim_do_pregao
+            # --- virada de pregao: fecha as posicoes antes de o dia mudar ---
+            if (abertas and self.fechar_no_fim_do_pregao
                     and candle_anterior is not None
                     and candle.tempo.date() != candle_anterior.tempo.date()):
-                self.executor.fechar(posicao, candle_anterior, "fim_do_pregao")
-                resultado.fechamentos_por_fim_de_pregao += 1
-                posicao = None
+                for posicao in abertas:
+                    self.executor.fechar(posicao, candle_anterior, "fim_do_pregao")
+                    resultado.fechamentos_por_fim_de_pregao += 1
+                abertas = []
 
-            # --- posicao aberta: acompanhar e avaliar saida ---
-            if posicao is not None:
+            # --- posicoes abertas: acompanhar e avaliar saida ---
+            sobreviventes = []
+            for posicao in abertas:
                 self.executor.acompanhar(posicao, candle)
-                if self._avaliar_saida(posicao, candle, resultado):
-                    posicao = None
+                if not self._avaliar_saida(posicao, candle, resultado):
+                    sobreviventes.append(posicao)
+            abertas = sobreviventes
 
             # --- sempre alimenta a estrategia, mesmo com posicao aberta ---
             sinal = self.estrategia.on_candle(candle)
 
             if sinal is not Sinal.NENHUM:
                 resultado.sinais_gerados += 1
-                if posicao is not None:
+                if abertas and not self.permitir_simultaneas:
                     resultado.sinais_ignorados_posicao_aberta += 1
                 else:
-                    posicao = self._abrir(sinal, candle)
+                    abertas.append(self._abrir(sinal, candle))
 
             candle_anterior = candle
 
@@ -242,6 +250,9 @@ def montar_do_config(cfg, caminho_pregao=None, caminho_menor=None,
         slippage=cfg.get("custos.slippage_indice", 0.5),
         comissao_por_lote=cfg.get("custos.comissao_por_lote", 0.0),
         valor_ponto_por_lote=cfg.exigir("custos.valor_ponto_por_lote"),
+        swap_compra=cfg.get("custos.swap_compra_indice", 0.0),
+        swap_venda=cfg.get("custos.swap_venda_indice", 0.0),
+        dia_swap_triplo=cfg.get("custos.dia_swap_triplo", 4),
     )
 
     motor = Motor(
