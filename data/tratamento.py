@@ -28,6 +28,10 @@ class RelatorioQualidade:
     removidos_fora_pregao: int = 0
     removidos_dia_nao_negociado: int = 0
     duplicados: int = 0
+    dias_descartados_por_densidade: int = 0
+    candles_descartados_por_densidade: int = 0
+    candles_antes_do_corte_inicial: int = 0
+    primeiro_dia_utilizavel: str = ""
     buracos_intra_sessao: int = 0
     maior_buraco_candles: int = 0
     detalhe_maiores_buracos: list = field(default_factory=list)
@@ -101,6 +105,46 @@ def filtrar_pregao(df: pd.DataFrame, rel: RelatorioQualidade) -> pd.DataFrame:
     return filtrado.reset_index(drop=True)
 
 
+def descartar_dias_ralos(df: pd.DataFrame, cfg: Config,
+                         rel: RelatorioQualidade) -> pd.DataFrame:
+    """Remove dias que tem candles de menos para serem pregao de verdade.
+
+    O terminal MT5 as vezes guarda uma barra solitaria por dia em periodos que
+    ele nunca baixou de fato. Essas barras passam por todas as validacoes
+    individuais - OHLC coerente, volume positivo - e mesmo assim nao descrevem
+    um pregao. Se entrarem no backtest viram sinais de rompimento inventados.
+
+    O corte e relativo a mediana do proprio ativo, entao nao depende de saber
+    quantos candles "deveria" ter cada timeframe.
+    """
+    fracao_minima = float(cfg.get("tratamento.densidade_minima_do_dia", 0.25))
+    if fracao_minima <= 0 or df.empty:
+        return df
+
+    por_dia = df.groupby(df["tempo_ativo"].dt.date).size()
+    minimo = por_dia.median() * fracao_minima
+    dias_ok = set(por_dia[por_dia >= minimo].index)
+
+    rel.dias_descartados_por_densidade = int(len(por_dia) - len(dias_ok))
+    manter = df["tempo_ativo"].dt.date.isin(dias_ok)
+    rel.candles_descartados_por_densidade = int((~manter).sum())
+
+    filtrado = df[manter]
+
+    # Corte explicito de data, aplicado depois do filtro estatistico.
+    corte = cfg.get("tratamento.data_inicial_utilizavel")
+    if corte:
+        limite = pd.Timestamp(corte).date()
+        antes = filtrado["tempo_ativo"].dt.date < limite
+        rel.candles_antes_do_corte_inicial = int(antes.sum())
+        filtrado = filtrado[~antes]
+
+    filtrado = filtrado.reset_index(drop=True)
+    if not filtrado.empty:
+        rel.primeiro_dia_utilizavel = str(filtrado["tempo_ativo"].dt.date.min())
+    return filtrado
+
+
 def analisar_buracos(df: pd.DataFrame, timeframe: str, cfg: Config,
                      rel: RelatorioQualidade) -> pd.DataFrame:
     """Procura candles faltando DENTRO de uma mesma sessao.
@@ -161,6 +205,7 @@ def processar(df_bruto: pd.DataFrame, timeframe: str,
     df = marcar_pregao(df, cfg)  # remarca apos a limpeza reindexar
 
     pregao = filtrar_pregao(df, rel)
+    pregao = descartar_dias_ralos(pregao, cfg, rel)
     pregao = analisar_buracos(pregao, timeframe, cfg, rel)
     rel.candles_pregao = len(pregao)
 

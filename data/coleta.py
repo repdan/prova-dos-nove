@@ -135,58 +135,84 @@ def coletar_candles(simbolo: str, timeframe: str, data_inicial: str,
     return df.reset_index(drop=True)
 
 
-def inferir_offset_servidor(df: pd.DataFrame, cfg: Config) -> tuple[int, float]:
-    """Descobre o fuso do servidor da corretora a partir dos proprios dados.
+# Fusos candidatos para o servidor da corretora. A maioria dos brokers MT5 roda
+# em EET/EEST (UTC+2 no inverno, UTC+3 no verao) - por isso Europe/Athens
+# encabeca a lista. Fusos fixos entram como rede de seguranca para o caso de um
+# servidor que realmente nao muda no horario de verao.
+FUSOS_CANDIDATOS = [
+    "Europe/Athens",      # EET/EEST - padrao de fato entre brokers MT5
+    "Europe/Helsinki",    # identico ao de Atenas na pratica
+    "Europe/London",      # GMT/BST
+    "Europe/Berlin",      # CET/CEST
+    "America/New_York",   # EST/EDT
+    "UTC",
+    "Etc/GMT-2", "Etc/GMT-3", "Etc/GMT-8",   # offsets fixos, sem horario de verao
+]
 
-    Ideia: o pregao de Hong Kong tem horario conhecido e fixo. Testamos cada
-    offset possivel (UTC-12 a UTC+14) e ficamos com aquele que joga a maior
-    parte do volume negociado para dentro da janela de pregao. E auto-corretivo:
-    se a corretora mudar de fuso no horario de verao, o numero muda junto.
 
-    Retorna (offset_em_horas, fracao_do_volume_dentro_do_pregao).
+def inferir_fuso_servidor(df: pd.DataFrame, cfg: Config) -> tuple[str, float, str]:
+    """Descobre em qual fuso o servidor da corretora carimba os candles.
+
+    Por que nao basta um offset em horas: a maioria dos servidores MT5 muda de
+    UTC+2 para UTC+3 no horario de verao europeu. Um numero fixo acerta metade
+    do ano e erra a outra metade em 60 minutos - o suficiente para embaralhar
+    toda a analise "melhor horario do dia" da Etapa 4, sem dar erro nenhum.
+
+    O teste usado aqui e a CONSISTENCIA da abertura: o pregao de Hong Kong abre
+    sempre no mesmo horario local. Convertendo com o fuso certo, a abertura cai
+    sempre no mesmo minuto; com o fuso errado, ela se parte em dois horarios
+    separados por uma hora, conforme o horario de verao. Ganha o fuso que
+    produzir a abertura mais consistente ao longo dos anos.
+
+    Retorna (nome_do_fuso, consistencia_0_a_1, horario_de_abertura_detectado).
     """
-    fuso = ZoneInfo(cfg.exigir("pregao.fuso_do_ativo"))
-    sessoes = cfg.exigir("pregao.sessoes_regulares")
-    volume = df["volume_ticks"].to_numpy(dtype="float64")
-    total = volume.sum()
-    if total <= 0:
-        raise ErroMT5("Volume total zerado - impossivel inferir o fuso do servidor.")
+    fuso_ativo = ZoneInfo(cfg.exigir("pregao.fuso_do_ativo"))
+    tempos = df["tempo_servidor"]
 
-    melhor_offset, melhor_score = 0, -1.0
-    for offset in range(-12, 15):
-        # Interpreta o horario do servidor como UTC+offset e converte para HK.
-        local = (
-            df["tempo_servidor"]
-            .dt.tz_localize(timezone.utc)
-            .sub(pd.Timedelta(hours=offset))
-            .dt.tz_convert(fuso)
-        )
-        minutos = local.dt.hour * 60 + local.dt.minute
-        dentro = np.zeros(len(df), dtype=bool)
-        for s in sessoes:
-            ini = _para_minutos(s["inicio"])
-            fim = _para_minutos(s["fim"])
-            dentro |= (minutos >= ini) & (minutos < fim)
-        score = volume[dentro].sum() / total
-        if score > melhor_score:
-            melhor_offset, melhor_score = offset, score
+    melhor = ("UTC", -1.0, "")
+    for nome_fuso in FUSOS_CANDIDATOS:
+        try:
+            # Interpreta o carimbo cru como hora local do servidor.
+            # Nas viradas de horario de verao o mercado esta fechado (madrugada
+            # de domingo), entao ambiguidade aqui e inofensiva.
+            local = tempos.dt.tz_localize(
+                ZoneInfo(nome_fuso), ambiguous=True, nonexistent="shift_forward")
+        except Exception:
+            continue
 
-    return melhor_offset, float(melhor_score)
+        em_hk = local.dt.tz_convert(fuso_ativo)
+        so_uteis = em_hk[em_hk.dt.dayofweek < 5]
+        if so_uteis.empty:
+            continue
+
+        # Horario do primeiro candle de cada dia util, em hora de Hong Kong.
+        aberturas = so_uteis.groupby(so_uteis.dt.date).min().dt.strftime("%H:%M")
+        if aberturas.empty:
+            continue
+        contagem = aberturas.value_counts()
+        consistencia = contagem.iloc[0] / contagem.sum()
+
+        if consistencia > melhor[1]:
+            melhor = (nome_fuso, float(consistencia), contagem.index[0])
+
+    return melhor
 
 
-def aplicar_fusos(df: pd.DataFrame, offset_servidor: int, fuso_ativo: str) -> pd.DataFrame:
+def aplicar_fusos(df: pd.DataFrame, fuso_servidor: str, fuso_ativo: str) -> pd.DataFrame:
     """Cria as colunas de tempo em UTC e no fuso do ativo.
 
     Todo o resto do projeto decide por 'tempo_ativo' (horario de Hong Kong),
     porque e o horario que define abertura, almoco e fechamento do pregao.
     'tempo_utc' fica como referencia absoluta e imune a horario de verao.
+
+    fuso_servidor e um nome de fuso ("Europe/Athens"), nao um numero de horas:
+    so assim a conversao acompanha sozinha as viradas de horario de verao.
     """
     df = df.copy()
-    df["tempo_utc"] = (
-        df["tempo_servidor"].dt.tz_localize(timezone.utc)
-        - pd.Timedelta(hours=offset_servidor)
-    )
-    df["tempo_ativo"] = df["tempo_utc"].dt.tz_convert(ZoneInfo(fuso_ativo))
+    local = df["tempo_servidor"].dt.tz_localize(
+        ZoneInfo(fuso_servidor), ambiguous=True, nonexistent="shift_forward")
+    df["tempo_utc"] = local.dt.tz_convert(timezone.utc)
+    df["tempo_ativo"] = local.dt.tz_convert(ZoneInfo(fuso_ativo))
     return df
 
 

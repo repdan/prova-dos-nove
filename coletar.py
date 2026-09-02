@@ -68,7 +68,7 @@ def main() -> int:
               f"{spec.volume_minimo} / {spec.volume_maximo} / {spec.passo_volume}")
         linha("Swap compra / venda", f"{spec.swap_compra} / {spec.swap_venda}")
 
-        offset_servidor = cfg.get("mt5.offset_servidor_utc")
+        fuso_servidor = cfg.get("mt5.fuso_servidor")
         resultados: dict[str, dict] = {}
 
         for indice, timeframe in enumerate(timeframes):
@@ -79,18 +79,17 @@ def main() -> int:
             linha("Candles recebidos do terminal", f"{len(bruto):,}".replace(",", "."))
 
             # O fuso do servidor e inferido uma unica vez, no timeframe
-            # prioritario (mais dados por candle = inferencia mais estavel),
-            # e reaproveitado nos demais.
-            if offset_servidor is None:
-                offset_servidor, confianca = coleta.inferir_offset_servidor(bruto, cfg)
-                linha("Fuso do servidor inferido", f"UTC{offset_servidor:+d}")
-                linha("Volume dentro do pregao (confianca)", f"{confianca:.1%}")
-                if confianca < 0.80:
-                    print("\n  [ATENCAO] Confianca baixa na inferencia do fuso.")
-                    print("  Confira o horario de pregao em config.yaml ou preencha")
-                    print("  mt5.offset_servidor_utc manualmente.\n")
+            # prioritario (mais dados = inferencia mais estavel), e reaproveitado.
+            if fuso_servidor is None:
+                fuso_servidor, consistencia, abertura = coleta.inferir_fuso_servidor(bruto, cfg)
+                linha("Fuso do servidor inferido", fuso_servidor)
+                linha("Abertura do pregao detectada", f"{abertura} (hora de Hong Kong)")
+                linha("Consistencia da abertura", f"{consistencia:.1%}")
+                if consistencia < 0.90:
+                    print("\n  [ATENCAO] A abertura do pregao nao e consistente com")
+                    print("  nenhum fuso testado. Preencha mt5.fuso_servidor a mao.\n")
 
-            com_fuso = coleta.aplicar_fusos(bruto, offset_servidor, fuso_ativo)
+            com_fuso = coleta.aplicar_fusos(bruto, fuso_servidor, fuso_ativo)
             df_bruto, df_pregao, rel = tratamento.processar(com_fuso, timeframe, cfg)
 
             if df_pregao.empty:
@@ -119,6 +118,11 @@ def main() -> int:
             linha("Removidos: volume zero", rel.removidos_volume_zero)
             linha("Removidos: OHLC invalido", rel.removidos_ohlc_invalido)
             linha("Duplicados", rel.duplicados)
+            linha("Dias descartados por falta de dado",
+                  f"{rel.dias_descartados_por_densidade} "
+                  f"({rel.candles_descartados_por_densidade} candles)")
+            linha("Candles antes do corte inicial", rel.candles_antes_do_corte_inicial)
+            linha("Primeiro dia realmente utilizavel", rel.primeiro_dia_utilizavel)
             linha("Buracos relevantes dentro da sessao", rel.buracos_intra_sessao)
             linha("Maior buraco (candles)", rel.maior_buraco_candles)
             for b in rel.detalhe_maiores_buracos[:3]:
@@ -140,7 +144,7 @@ def main() -> int:
             "simbolo": simbolo,
             "terminal": info,
             "especificacao_contrato": spec.como_dict(),
-            "offset_servidor_utc": offset_servidor,
+            "fuso_servidor": fuso_servidor,
             "fuso_do_ativo": fuso_ativo,
             "sessoes_regulares": cfg.get("pregao.sessoes_regulares"),
             "timeframes": resultados,
@@ -149,11 +153,9 @@ def main() -> int:
         titulo("RESUMO")
         linha("Metadados", meta.name)
         print()
-        print("  Para o backtest ficar honesto, copie no config.yaml (secao custos):")
-        print(f"      spread_pontos: {spec.spread_atual_pontos}")
-        print(f"      tamanho_contrato: {spec.tamanho_contrato}")
-        print(f"      valor_ponto: {spec.valor_ponto}")
-        print("      comissao_por_lote: <consultar na corretora - nao vem pela API>")
+        if not cfg.get("custos.comissao_por_lote"):
+            print("  [PENDENTE] custos.comissao_por_lote ainda esta zerado no config.")
+            print("  Sem esse numero o backtest superestima o lucro de todo trade.")
         print()
         return 0
 

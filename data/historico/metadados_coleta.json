@@ -1,0 +1,106 @@
+{
+  "gerado_em_utc": "2026-09-02T04:33:59.088399+00:00",
+  "simbolo": "HK50",
+  "terminal": {
+    "terminal_build": 6140,
+    "terminal_conectado": true,
+    "trade_permitido": false,
+    "servidor": "Corretora-Demo",
+    "moeda_conta": "USD",
+    "tipo_conta": "DEMO"
+  },
+  "especificacao_contrato": {
+    "nome": "HK50",
+    "descricao": "Hong Kong 50 Index",
+    "digitos": 2,
+    "ponto": 0.01,
+    "spread_atual_pontos": 450,
+    "spread_flutuante": true,
+    "tamanho_contrato": 1.0,
+    "valor_ponto": 1.0,
+    "volume_minimo": 0.01,
+    "volume_maximo": 100.0,
+    "passo_volume": 0.01,
+    "moeda_lucro": "HKD",
+    "swap_compra": -550.0,
+    "swap_venda": 3.046798
+  },
+  "fuso_servidor": "Europe/Athens",
+  "fuso_do_ativo": "Asia/Hong_Kong",
+  "sessoes_regulares": [
+    {
+      "inicio": "09:15",
+      "fim": "12:00"
+    },
+    {
+      "inicio": "13:00",
+      "fim": "16:30"
+    }
+  ],
+  "timeframes": {
+    "M15": {
+      "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\HK50_M15_bruto.parquet",
+      "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\HK50_M15_pregao.parquet",
+      "inicio": "2022-02-16 09:15:00+08:00",
+      "fim": "2026-09-02 11:45:00+08:00",
+      "anos": 4.54,
+      "qualidade": {
+        "candles_brutos": 77365,
+        "candles_pregao": 27099,
+        "removidos_ohlc_invalido": 0,
+        "removidos_volume_zero": 0,
+        "removidos_fora_pregao": 45268,
+        "removidos_dia_nao_negociado": 2875,
+        "duplicados": 0,
+        "dias_descartados_por_densidade": 320,
+        "candles_descartados_por_densidade": 2123,
+        "candles_antes_do_corte_inicial": 0,
+        "primeiro_dia_utilizavel": "2022-02-16",
+        "buracos_intra_sessao": 0,
+        "maior_buraco_candles": 2,
+        "detalhe_maiores_buracos": [
+          {
+            "quando": "2025-09-15 14:45:00+08:00",
+            "candles_faltando": 2
+          }
+        ],
+        "dias_negociados": 1115,
+        "candles_por_dia_mediana": 25.0
+      }
+    },
+    "M5": {
+      "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\HK50_M5_bruto.parquet",
+      "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\HK50_M5_pregao.parquet",
+      "inicio": "2024-07-10 13:55:00+08:00",
+      "fim": "2026-09-02 11:55:00+08:00",
+      "anos": 2.14,
+      "qualidade": {
+        "candles_brutos": 100000,
+        "candles_pregao": 38320,
+        "removidos_ohlc_invalido": 0,
+        "removidos_volume_zero": 0,
+        "removidos_fora_pregao": 57834,
+        "removidos_dia_nao_negociado": 3804,
+        "duplicados": 0,
+        "dias_descartados_por_densidade": 2,
+        "candles_descartados_por_densidade": 42,
+        "candles_antes_do_corte_inicial": 0,
+        "primeiro_dia_utilizavel": "2024-07-10",
+        "buracos_intra_sessao": 1,
+        "maior_buraco_candles": 7,
+        "detalhe_maiores_buracos": [
+          {
+            "quando": "2025-09-15 14:50:00+08:00",
+            "candles_faltando": 7
+          },
+          {
+            "quando": "2024-11-20 09:55:00+08:00",
+            "candles_faltando": 3
+          }
+        ],
+        "dias_negociados": 527,
+        "candles_por_dia_mediana": 75.0
+      }
+    }
+  }
+}

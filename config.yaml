@@ -16,10 +16,12 @@ mt5:
   simbolo: null
   padroes_busca_simbolo: ["HK50", "HKG33", "HSI", "HANGSENG", "HK_50"]
 
-  # Fuso do servidor da corretora em horas de diferenca do UTC.
-  # null = o script infere sozinho a partir dos dados (recomendado).
-  # Se voce souber o valor exato, preencha para pular a inferencia.
-  offset_servidor_utc: null
+  # Fuso do servidor da corretora, como NOME de fuso - nunca como numero de
+  # horas. Medido em 02/09/2026: o servidor da corretora abre o pregao as 03:15 no
+  # inverno e as 04:15 no verao, ou seja, ele MUDA no horario de verao (EET/EEST).
+  # Um offset fixo acertaria metade do ano e erraria a outra em 60 minutos.
+  # null = o script infere sozinho a partir dos dados.
+  fuso_servidor: "Europe/Athens"
 
 # -----------------------------------------------------------------------------
 # COLETA DE DADOS HISTORICOS
@@ -70,18 +72,45 @@ tratamento:
   # Remove candles com OHLC inconsistente (ex: minima > maxima).
   remover_ohlc_invalido: true
 
+  # Descarta o dia inteiro quando ele tem candles demais faltando.
+  # Motivo concreto: no historico do HK50 na corretora, tudo antes de marco/2022
+  # vem com ~1 candle por dia em vez de 25 - sao barras-fantasma do terminal,
+  # nao pregao. Um dia com 4% dos candles esperados nao e um pregao curto, e
+  # ausencia de dado, e treinar ML em cima disso e treinar em ruido.
+  # Fracao da MEDIANA de candles por dia abaixo da qual o dia e descartado.
+  # Medido no HK50 da corretora: 2020 e 2021 vem com mediana de 7 candles por dia
+  # (28% de um pregao), enquanto 2022 em diante vem com os 25 completos.
+  # 0.35 descarta os dias de 28% e ainda preserva meio-pregao real (~45%),
+  # que existe de verdade em vesperas de feriado em Hong Kong.
+  densidade_minima_do_dia: 0.35
+
+  # Corte explicito de inicio do historico utilizavel. O filtro de densidade
+  # acima ja limpa dia a dia, mas este corte deixa a decisao visivel em vez de
+  # depender de um limiar: no HK50 da corretora o dado so fica integro em 2022.
+  # null = sem corte, usa tudo que sobreviver ao filtro de densidade.
+  data_inicial_utilizavel: "2022-01-01"
+
 # -----------------------------------------------------------------------------
 # CUSTOS DE OPERACAO
 # ATENCAO: sem numeros corretos aqui o backtest MENTE. Os campos com null sao
 # preenchidos automaticamente a partir da especificacao do contrato no MT5;
 # a comissao NAO vem pela API e precisa ser informada manualmente.
 # -----------------------------------------------------------------------------
+# Tudo aqui e em PONTOS DE INDICE (1.0 = o indice andou 1 ponto), nunca no
+# "point" do MT5 (0.01). Misturar as duas unidades erra os custos por 100x.
 custos:
-  spread_pontos: null          # preenchido pela coleta (spread tipico do simbolo)
-  comissao_por_lote: 0.0       # PREENCHER MANUALMENTE - ver contrato na corretora
-  slippage_pontos: 1.0         # derrapagem estimada por entrada/saida
-  tamanho_contrato: null       # preenchido pela coleta
-  valor_ponto: null            # preenchido pela coleta
+  # Spread mediano medido em 60.000 candles M15 dentro do pregao regular.
+  # Fora do pregao ele sobe para ~5.0, mais um motivo para o filtro de sessao.
+  spread_indice: 4.5
+
+  # Medido com mt5.order_calc_profit em 02/09/2026 (conta em USD):
+  # 1 lote, movimento de 100 pontos de indice = 12.75 USD.
+  valor_ponto_por_lote: 0.1275   # USD por ponto de indice, por lote
+  moeda: "USD"
+
+  comissao_por_lote: 0.0       # PREENCHER - nao vem pela API, so na corretora
+  slippage_indice: 0.5         # derrapagem estimada por ponta, em pontos de indice
+  tamanho_contrato: 1.0
 
 # -----------------------------------------------------------------------------
 # ESTRATEGIA (Etapa 2 - ainda nao implementada, parametros ja reservados)

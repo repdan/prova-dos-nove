@@ -18,7 +18,7 @@ from configuracao import Config
 from data.coleta import TIMEFRAMES
 from data.mt5_conexao import (
     ErroMT5, conectar, desconectar, descobrir_simbolo,
-    garantir_simbolo_visivel, info_terminal, ler_sessoes_declaradas,
+    garantir_simbolo_visivel, info_terminal,
 )
 
 # Abaixo disso o backtest nao tem base estatistica para walk-forward:

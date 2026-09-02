@@ -84,11 +84,68 @@ Toda linha removida vai para o relatório de qualidade com o motivo, e o arquivo
 
 | Etapa | Status |
 |---|---|
-| 1 — Coleta e tratamento de dados | ✅ implementada, testada, aguardando execução com MT5 aberto |
+| 1 — Coleta e tratamento de dados | ✅ **concluída** — dados coletados e validados |
 | 2 — Estratégia de canal (plugin) | ⬜ não iniciada |
 | 3 — Engine de backtest event-driven | ⬜ não iniciada |
 | 4 — Camada de machine learning | ⬜ não iniciada |
 | 5 — Relatório final | ⬜ não iniciada |
+
+---
+
+## O que a Etapa 1 encontrou (execução de 02/09/2026)
+
+**Símbolo:** `HK50` — Hong Kong 50 Index · servidor `Corretora-Demo` · conta DEMO
+
+| Timeframe | Período utilizável | Pregões | Candles | Buracos |
+|---|---|---|---|---|
+| **M15** (prioritário) | 2022-02-16 → 2026-09-02 (4,54 anos) | 1.115 | 27.099 | 0 |
+| M5 (só para intrabar) | 2024-07-10 → 2026-09-02 (2,14 anos) | 527 | 38.320 | 1 |
+
+### O servidor da corretora muda de fuso no horário de verão
+
+Medido: o pregão abre às **03:15 no inverno e 04:15 no verão**, hora do servidor —
+ou seja, EET/EEST (UTC+2 / UTC+3). Um offset fixo em horas acertaria metade do ano
+e erraria a outra metade em 60 minutos, **sem dar erro nenhum** — só entregaria uma
+análise de "melhor horário do dia" embaralhada.
+
+Por isso o config guarda um **nome de fuso** (`Europe/Athens`), nunca um número.
+A conversão acompanha as viradas sozinha, e há um teste que falha se alguém trocar
+por um offset fixo.
+
+### Sessão confirmada pelos dados
+
+O pregão configurado (09:15–12:00 e 13:00–16:30 HK) foi **confirmado**, não assumido:
+o último tick antes da pausa cai às 11:59:59 de Hong Kong, no minuto exato.
+
+| Sessão | Hong Kong | Brasília |
+|---|---|---|
+| Manhã | 09:15–12:00 | 22:15–01:00 |
+| Tarde | 13:00–16:30 | 02:00–05:30 |
+| _After-hours (excluído)_ | _17:15–03:00_ | _06:15–16:00_ |
+
+O pico de volume é às **09:30 HK (22:30 de Brasília)**. O after-hours tem 5 a 10× menos
+volume e spread mais largo — excluí-lo é o que o filtro de sessão faz.
+
+### Custos reais medidos
+
+| Item | Valor | Origem |
+|---|---|---|
+| Spread mediano | **4,5 pontos de índice** | mediana de 60.000 candles M15 no pregão |
+| Spread fora do pregão | ~5,0 pontos | mesma medição |
+| Valor do ponto | **0,1275 USD** por ponto de índice, por lote | `order_calc_profit` do MT5 |
+| Margem | ~80 USD por lote | `order_calc_margin` |
+| Comissão | ⚠️ **pendente** | não vem pela API |
+
+### Dados descartados, e por quê
+
+Antes de fevereiro/2022 o terminal entrega ~7 candles por dia em vez de 25 — barras
+residuais, não pregão. Passam por qualquer validação individual (OHLC coerente,
+volume positivo) e ainda assim inventariam rompimentos que nunca existiram.
+Descartadas por dois filtros independentes que concordam entre si: densidade mínima
+diária (35% da mediana) e corte explícito de data.
+
+**M1 e M5 param em exatos 100.000 candles** — teto do terminal, não do servidor.
+Só o M15 (77.365) fica abaixo do teto e por isso alcança mais anos.
 
 ---
 
