@@ -86,7 +86,7 @@ Toda linha removida vai para o relatório de qualidade com o motivo, e o arquivo
 |---|---|
 | 1 — Coleta e tratamento de dados | ✅ **concluída** — dados coletados e validados |
 | 2 — Estratégia de canal (plugin) | ✅ **concluída** — 23 testes, validada nos dados reais |
-| 3 — Engine de backtest event-driven | ⬜ não iniciada |
+| 3 — Engine de backtest event-driven | ✅ **concluída** — 36 testes, baseline medido |
 | 4 — Camada de machine learning | ⬜ não iniciada |
 | 5 — Relatório final | ⬜ não iniciada |
 
@@ -172,6 +172,33 @@ A regra base **não será alterada** (é o baseline que o projeto quer medir), m
 - a engine reporta a **perda máxima por trade** como métrica de primeira classe;
 - existe um `stop_catastrofico_ativo` no config, **desligado por padrão**, para
   medir quanto custaria ter uma rede de segurança.
+
+## Resultado do baseline (Etapa 3)
+
+`stop_gain`, canal por média de 20, M15, 2022-02 a 2026-09, lote 0,01:
+
+| Modo de saída | Trades | Acerto | Fator de lucro | Pontos | Sharpe |
+|---|---|---|---|---|---|
+| **stop_gain** | 1.211 | 36% | **1,04** | **+3.939** | 0,24 |
+| trailing | 1.225 | 35% | 1,03 | +2.922 | 0,18 |
+| fibo_expansion | 1.529 | 49% | 0,78 | −25.926 | −2,19 |
+
+**O custo de transação consumiu 69% do lucro bruto** (12.781 brutos → 3.939
+líquidos), e a comissão ainda está em zero. É o número mais importante do
+projeto até aqui.
+
+### Onde o dinheiro é feito e perdido
+
+| Regime do dia (direcionalidade) | Trades | Pontos | Acerto |
+|---|---|---|---|
+| 0–25% — lateral | 400 | **−22.797** | 24% |
+| 25–50% | 375 | −405 | 35% |
+| 50–75% | 324 | +15.098 | 44% |
+| 75–100% — tendência | 110 | **+12.306** | 54% |
+
+A hipótese do prompt original está confirmada com números: **todo o lucro vem
+de dias direcionais, e os dias laterais devolvem quase tudo.** Isolar esse
+regime é a razão de existir da Etapa 4.
 
 ### Sobre o nome "Donchian"
 

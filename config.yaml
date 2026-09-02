@@ -113,7 +113,22 @@ custos:
   tamanho_contrato: 1.0
 
 # -----------------------------------------------------------------------------
-# ESTRATEGIA (Etapa 2 - ainda nao implementada, parametros ja reservados)
+# BACKTEST
+# -----------------------------------------------------------------------------
+backtest:
+  capital_inicial: 10000.0     # so para expressar drawdown em %; lote e fixo
+
+  # Encerrar posicao aberta na virada do pregao?
+  #   false = baseline puro, exatamente como a estrategia foi descrita
+  #           (so sai no rompimento da media oposta, custe o que custar)
+  #   true  = day trade de verdade, sem exposicao noturna
+  # Medido na Etapa 2.5: o pior gap entre pregoes foi de 1.673 pontos, e o
+  # swap de posicao comprada e -550. O relatorio roda as duas versoes lado a
+  # lado para a escolha sair de numero, nao de intuicao.
+  fechar_no_fim_do_pregao: false
+
+# -----------------------------------------------------------------------------
+# ESTRATEGIA
 # -----------------------------------------------------------------------------
 estrategia:
   periodo_canal: 20            # periodo das medias de maxima e de minima
