@@ -117,7 +117,12 @@ custos:
 # -----------------------------------------------------------------------------
 estrategia:
   periodo_canal: 20            # periodo das medias de maxima e de minima
-  lote: 0.1
+
+  # Lote MINIMO permitido pelo simbolo (volume_min = 0.01). Nesta fase o
+  # resultado e medido em PONTOS, nao em dinheiro, entao o lote so define a
+  # escala da conta de exemplo - e o minimo mantem a demo fora de risco.
+  # Com 0.01: 1 ponto de indice = 0.001275 USD.
+  lote: 0.01
   modo_saida: "stop_gain"      # stop_gain | trailing | fibo_expansion | ml_probabilidade
   fibo_nivel: 2.0              # 200% da largura do canal
   ml_limiar_saida: 0.45        # probabilidade minima para manter a posicao aberta

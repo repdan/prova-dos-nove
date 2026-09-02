@@ -1,5 +1,5 @@
 {
-  "gerado_em_utc": "2026-09-02T04:33:59.088399+00:00",
+  "gerado_em_utc": "2026-09-02T04:49:06.783439+00:00",
   "simbolo": "HK50",
   "terminal": {
     "terminal_build": 6140,
@@ -71,21 +71,21 @@
     "M5": {
       "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\HK50_M5_bruto.parquet",
       "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\HK50_M5_pregao.parquet",
-      "inicio": "2024-07-10 13:55:00+08:00",
+      "inicio": "2022-02-16 09:15:00+08:00",
       "fim": "2026-09-02 11:55:00+08:00",
-      "anos": 2.14,
+      "anos": 4.54,
       "qualidade": {
-        "candles_brutos": 100000,
-        "candles_pregao": 38320,
+        "candles_brutos": 219015,
+        "candles_pregao": 81285,
         "removidos_ohlc_invalido": 0,
         "removidos_volume_zero": 0,
-        "removidos_fora_pregao": 57834,
-        "removidos_dia_nao_negociado": 3804,
+        "removidos_fora_pregao": 127338,
+        "removidos_dia_nao_negociado": 8241,
         "duplicados": 0,
-        "dias_descartados_por_densidade": 2,
-        "candles_descartados_por_densidade": 42,
+        "dias_descartados_por_densidade": 320,
+        "candles_descartados_por_densidade": 2151,
         "candles_antes_do_corte_inicial": 0,
-        "primeiro_dia_utilizavel": "2024-07-10",
+        "primeiro_dia_utilizavel": "2022-02-16",
         "buracos_intra_sessao": 1,
         "maior_buraco_candles": 7,
         "detalhe_maiores_buracos": [
@@ -96,9 +96,13 @@
           {
             "quando": "2024-11-20 09:55:00+08:00",
             "candles_faltando": 3
+          },
+          {
+            "quando": "2023-05-03 14:55:00+08:00",
+            "candles_faltando": 1
           }
         ],
-        "dias_negociados": 527,
+        "dias_negociados": 1115,
         "candles_por_dia_mediana": 75.0
       }
     }
