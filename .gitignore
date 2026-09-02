@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/historico/*.parquet
+data/historico/*.csv
+reports/*.png
+reports/*.html
+ml/modelos/*.pkl
+.pytest_cache/

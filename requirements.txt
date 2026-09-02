@@ -1,0 +1,14 @@
+# Etapa 1 - coleta e tratamento de dados
+MetaTrader5>=5.0.6147   # so funciona em Windows, com o terminal MT5 aberto e logado
+pandas>=2.2
+numpy>=2.0
+pyarrow>=17            # engine parquet
+PyYAML>=6.0            # leitura do config.yaml
+tzdata>=2024.1         # base de fusos horarios (necessaria no Windows para zoneinfo)
+
+# Etapas 3-5 - backtest, ML e relatorios
+matplotlib>=3.9
+scikit-learn>=1.5
+lightgbm>=4.5
+optuna>=4.0
+pytest>=8.0

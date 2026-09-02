@@ -1,0 +1,99 @@
+# =============================================================================
+# CONFIGURACAO UNICA DO PROJETO
+# Nenhum parametro de estrategia, dado ou custo deve estar hardcoded no codigo.
+# Se voce quer mudar o comportamento do sistema, e aqui que voce mexe.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CONEXAO COM O METATRADER 5
+# -----------------------------------------------------------------------------
+mt5:
+  # Caminho do terminal. O terminal precisa estar ABERTO E LOGADO antes de rodar.
+  caminho_terminal: "C:/Program Files/MetaTrader 5/terminal64.exe"
+
+  # Nome do simbolo na corretora. Se ficar null, o script procura sozinho
+  # entre os simbolos disponiveis usando a lista de padroes abaixo.
+  simbolo: null
+  padroes_busca_simbolo: ["HK50", "HKG33", "HSI", "HANGSENG", "HK_50"]
+
+  # Fuso do servidor da corretora em horas de diferenca do UTC.
+  # null = o script infere sozinho a partir dos dados (recomendado).
+  # Se voce souber o valor exato, preencha para pular a inferencia.
+  offset_servidor_utc: null
+
+# -----------------------------------------------------------------------------
+# COLETA DE DADOS HISTORICOS
+# -----------------------------------------------------------------------------
+coleta:
+  # Timeframes a coletar. O primeiro da lista e o prioritario do projeto.
+  timeframes: ["M15", "M5"]
+
+  # Data inicial da busca. O MT5 devolve apenas o que o terminal tem em cache,
+  # entao pedir desde 2010 e seguro: ele simplesmente entrega o que existir.
+  data_inicial: "2010-01-01"
+
+  # Pasta onde os arquivos parquet sao gravados.
+  pasta_saida: "data/historico"
+
+# -----------------------------------------------------------------------------
+# PREGAO / SESSAO DE NEGOCIACAO
+# Horarios no fuso de Hong Kong (Asia/Hong_Kong), que e o fuso do ativo.
+# -----------------------------------------------------------------------------
+pregao:
+  fuso_do_ativo: "Asia/Hong_Kong"
+
+  # DECISAO DO PROJETO: operar apenas o pregao regular (onde esta a liquidez).
+  # A estrategia e de rompimento e depende de volume - after-hours polui o sinal.
+  # Para incluir a sessao noturna, adicione a faixa dela nesta lista.
+  sessoes_regulares:
+    - {inicio: "09:15", fim: "12:00"}
+    - {inicio: "13:00", fim: "16:30"}
+
+  # Dias da semana negociados (0=segunda ... 6=domingo).
+  dias_negociados: [0, 1, 2, 3, 4]
+
+# -----------------------------------------------------------------------------
+# TRATAMENTO E QUALIDADE DOS DADOS
+# -----------------------------------------------------------------------------
+tratamento:
+  # Um "gap" e a ausencia de um candle esperado dentro do horario de pregao.
+  # Gaps normais (fim de semana, feriado, intervalo do almoco) nao sao problema.
+  # O relatorio separa os dois tipos para voce enxergar buracos reais na base.
+
+  # Acima de quantos candles seguidos ausentes um gap vira suspeito de falha
+  # de coleta e nao apenas de mercado fechado.
+  candles_faltando_para_alertar: 4
+
+  # Remove candles com volume zero (barras "fantasma" que o MT5 as vezes cria).
+  remover_volume_zero: true
+
+  # Remove candles com OHLC inconsistente (ex: minima > maxima).
+  remover_ohlc_invalido: true
+
+# -----------------------------------------------------------------------------
+# CUSTOS DE OPERACAO
+# ATENCAO: sem numeros corretos aqui o backtest MENTE. Os campos com null sao
+# preenchidos automaticamente a partir da especificacao do contrato no MT5;
+# a comissao NAO vem pela API e precisa ser informada manualmente.
+# -----------------------------------------------------------------------------
+custos:
+  spread_pontos: null          # preenchido pela coleta (spread tipico do simbolo)
+  comissao_por_lote: 0.0       # PREENCHER MANUALMENTE - ver contrato na corretora
+  slippage_pontos: 1.0         # derrapagem estimada por entrada/saida
+  tamanho_contrato: null       # preenchido pela coleta
+  valor_ponto: null            # preenchido pela coleta
+
+# -----------------------------------------------------------------------------
+# ESTRATEGIA (Etapa 2 - ainda nao implementada, parametros ja reservados)
+# -----------------------------------------------------------------------------
+estrategia:
+  periodo_canal: 20            # periodo das medias de maxima e de minima
+  lote: 0.1
+  modo_saida: "stop_gain"      # stop_gain | trailing | fibo_expansion | ml_probabilidade
+  fibo_nivel: 2.0              # 200% da largura do canal
+  ml_limiar_saida: 0.45        # probabilidade minima para manter a posicao aberta
+
+  # Rede de seguranca DESLIGADA por padrao: a estrategia base nao tem stop loss.
+  # Serve para medir qual seria a perda maxima por trade se houvesse um limite.
+  stop_catastrofico_ativo: false
+  stop_catastrofico_atr: 3.0
