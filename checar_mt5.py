@@ -65,7 +65,8 @@ def main() -> int:
 
         print()
         if tudo_ok:
-            print("  PRONTO. Pode rodar: .venv\Scripts\python.exe coletar.py\n")
+            print("  PRONTO. Pode rodar: .venv/Scripts/python.exe coletar.py")
+            print()
             return 0
 
         print(f"  Historico abaixo de {MINIMO_ACEITAVEL_ANOS} anos em pelo menos um timeframe.")
