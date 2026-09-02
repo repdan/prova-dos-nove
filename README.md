@@ -85,7 +85,7 @@ Toda linha removida vai para o relatório de qualidade com o motivo, e o arquivo
 | Etapa | Status |
 |---|---|
 | 1 — Coleta e tratamento de dados | ✅ **concluída** — dados coletados e validados |
-| 2 — Estratégia de canal (plugin) | ⬜ não iniciada |
+| 2 — Estratégia de canal (plugin) | ✅ **concluída** — 23 testes, validada nos dados reais |
 | 3 — Engine de backtest event-driven | ⬜ não iniciada |
 | 4 — Camada de machine learning | ⬜ não iniciada |
 | 5 — Relatório final | ⬜ não iniciada |
@@ -172,6 +172,17 @@ A regra base **não será alterada** (é o baseline que o projeto quer medir), m
 - a engine reporta a **perda máxima por trade** como métrica de primeira classe;
 - existe um `stop_catastrofico_ativo` no config, **desligado por padrão**, para
   medir quanto custaria ter uma rede de segurança.
+
+### Sobre o nome "Donchian"
+
+O prompt original descreve "canal tipo Donchian: duas médias móveis de 20
+períodos, uma sobre as máximas e outra sobre as mínimas". Essas são **duas
+coisas diferentes**: Donchian clássico usa o *maior* máximo e o *menor* mínimo
+da janela; o que está descrito é a *média* dos máximos e a *média* dos mínimos.
+
+Implementei o que foi descrito (média) como padrão, e o Donchian clássico como
+alternativa em `estrategia.tipo_canal`. Assim a Etapa 4 compara as duas com o
+mesmo engine, em vez de a gente escolher no escuro.
 
 ### Retreino do modelo (Etapa 4)
 

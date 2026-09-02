@@ -127,6 +127,20 @@ estrategia:
   fibo_nivel: 2.0              # 200% da largura do canal
   ml_limiar_saida: 0.45        # probabilidade minima para manter a posicao aberta
 
+  # Como o canal e formado:
+  #   media    - media movel das maximas e das minimas (o que voce descreveu)
+  #   donchian - maior maxima e menor minima da janela (Donchian classico)
+  # Sao coisas diferentes: o canal por media e mais estreito e reage mais
+  # rapido. Ficam os dois para a Etapa 4 comparar com o mesmo engine.
+  tipo_canal: "media"
+
+  # Que preco precisa sair do canal para valer como rompimento:
+  #   fechamento - o candle precisa FECHAR fora (conservador, menos sinal falso)
+  #   extremo    - basta o pavio furar (mais sinais, mais ruido)
+  preco_referencia: "fechamento"
+
+  periodo_atr: 14              # so para features de contexto do ML
+
   # Rede de seguranca DESLIGADA por padrao: a estrategia base nao tem stop loss.
   # Serve para medir qual seria a perda maxima por trade se houvesse um limite.
   stop_catastrofico_ativo: false
