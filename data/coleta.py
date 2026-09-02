@@ -15,6 +15,7 @@ Duas sutilezas que costumam estragar backtest e que sao tratadas aqui:
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -39,12 +40,40 @@ TIMEFRAMES = {
 MINUTOS_POR_TIMEFRAME = {"M1": 1, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240, "D1": 1440}
 
 
-def coletar_candles(simbolo: str, timeframe: str, data_inicial: str) -> pd.DataFrame:
+def _puxar_bloco(simbolo: str, tf: int, inicio: datetime, fim: datetime,
+                 tentativas: int, espera_s: float) -> np.ndarray | None:
+    """Pede um bloco ao terminal, com repeticao.
+
+    Detalhe que economiza muito trabalho manual: copy_rates_range NAO le apenas
+    o cache - ela tambem dispara o download do periodo pedido no terminal. So
+    que o download e assincrono, entao a primeira chamada costuma voltar vazia
+    enquanto o terminal ainda busca. Repetir depois de uma pausa curta resolve,
+    e evita ter que rolar o grafico para tras na mao.
+    """
+    melhor = None
+    for tentativa in range(tentativas):
+        rates = mt5.copy_rates_range(simbolo, tf, inicio, fim)
+        if rates is not None and len(rates) > 0:
+            if melhor is None or len(rates) > len(melhor):
+                melhor = rates
+            # Duas leituras seguidas com o mesmo tamanho = download terminou.
+            if tentativa > 0 and len(rates) == len(melhor):
+                break
+        if tentativa < tentativas - 1:
+            time.sleep(espera_s)
+    return melhor
+
+
+def coletar_candles(simbolo: str, timeframe: str, data_inicial: str,
+                    tentativas: int = 3, espera_s: float = 2.0) -> pd.DataFrame:
     """Baixa todos os candles disponiveis, em blocos anuais.
 
     O bloco anual existe porque o terminal limita quantas barras devolve de uma
     vez ('Max. barras no grafico'). Pedir ano a ano contorna esse teto sem
     depender da configuracao da maquina.
+
+    Blocos vazios sao repetidos algumas vezes antes de desistir, para dar tempo
+    do terminal baixar o periodo do servidor da corretora.
     """
     if timeframe not in TIMEFRAMES:
         raise ValueError(f"Timeframe '{timeframe}' desconhecido. Use: {list(TIMEFRAMES)}")
@@ -56,11 +85,23 @@ def coletar_candles(simbolo: str, timeframe: str, data_inicial: str) -> pd.DataF
 
     blocos: list[np.ndarray] = []
     cursor = inicio
+    vazios_seguidos = 0
     while cursor < fim:
         proximo = min(cursor.replace(year=cursor.year + 1), fim)
-        rates = mt5.copy_rates_range(simbolo, tf, cursor, proximo)
+        # Antes do primeiro dado aparecer, insistir em cada ano vazio custaria
+        # minutos a toa (o historico do HK50 nao comeca em 2010). So vale
+        # insistir depois que o historico ja comecou.
+        insistir = tentativas if blocos else 1
+        rates = _puxar_bloco(simbolo, tf, cursor, proximo, insistir, espera_s)
+
         if rates is not None and len(rates) > 0:
             blocos.append(rates)
+            vazios_seguidos = 0
+        elif blocos:
+            vazios_seguidos += 1
+            # Dois anos seguidos vazios depois de ja ter dado = fim do historico.
+            if vazios_seguidos >= 2:
+                break
         cursor = proximo
 
     if not blocos:

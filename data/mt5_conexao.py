@@ -10,6 +10,7 @@ Todo o acesso feito aqui e SOMENTE LEITURA - nenhuma ordem e enviada.
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+from datetime import datetime, time as hora_do_dia
 from pathlib import Path
 
 import MetaTrader5 as mt5
@@ -158,3 +159,40 @@ def ler_especificacao(simbolo: str) -> EspecificacaoSimbolo:
         swap_compra=info.swap_long,
         swap_venda=info.swap_short,
     )
+
+
+def ler_sessoes_declaradas(simbolo: str) -> dict[str, list[dict]]:
+    """Le o horario de pregao que a PROPRIA corretora declara para o simbolo.
+
+    Por que isso importa: o CFD de indice da corretora nem sempre segue o
+    horario da bolsa de origem. A corretora pode abrir antes, fechar depois ou
+    oferecer sessao estendida. Em vez de assumir o pregao do Hang Seng e torcer,
+    perguntamos ao terminal.
+
+    ATENCAO: os horarios vem no fuso do SERVIDOR da corretora, nao em UTC nem
+    em Hong Kong. Quem converte e quem chama, usando o offset inferido.
+
+    Retorna {dia_da_semana: [{inicio, fim}, ...]} com os dias em portugues.
+    """
+    dias = ["Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado", "Domingo"]
+    resultado: dict[str, list[dict]] = {}
+
+    for indice, nome_dia in enumerate(dias):
+        # A API indexa a semana com domingo = 0.
+        dia_mt5 = (indice + 1) % 7
+        sessoes = []
+        for slot in range(4):  # o MT5 permite ate 4 sessoes por dia
+            faixa = mt5.symbol_info_session_trade(simbolo, dia_mt5, slot)
+            if faixa is None:
+                break
+            inicio, fim = faixa
+            if isinstance(inicio, datetime):
+                inicio, fim = inicio.time(), fim.time()
+            elif isinstance(inicio, (int, float)):
+                inicio = hora_do_dia(int(inicio) // 3600 % 24, int(inicio) // 60 % 60)
+                fim = hora_do_dia(int(fim) // 3600 % 24, int(fim) // 60 % 60)
+            sessoes.append({"inicio": f"{inicio:%H:%M}", "fim": f"{fim:%H:%M}"})
+        if sessoes:
+            resultado[nome_dia] = sessoes
+
+    return resultado
