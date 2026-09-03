@@ -108,7 +108,19 @@ custos:
   valor_ponto_por_lote: 0.1275   # USD por ponto de indice, por lote
   moeda: "USD"
 
-  comissao_por_lote: 0.0       # PREENCHER - nao vem pela API, so na corretora
+  # Confirmado na especificacao do contrato em 03/09/2026:
+  # "0.1 USD por lote, instantanea pelo volume, transacoes de entrada".
+  # So na entrada, entao 0.78 pontos de indice por giro completo.
+  comissao_por_lote: 0.1
+
+  # Cenario de spread para o backtest:
+  #   null  = usa o spread REAL de cada candle do historico
+  #   numero = forca esse spread em todos os candles
+  # Existe porque o spread do HK50 mudou de patamar durante a base (9-10 pontos
+  # ate 2024, 1.6-4.5 depois). Medir o periodo inteiro com o spread historico
+  # mistura dois regimes; forcar um valor responde "e se o custo de hoje
+  # valesse para tudo?". Nenhum dos dois e a verdade sozinho - por isso os dois.
+  spread_forcado: null
   slippage_indice: 0.5         # derrapagem estimada por ponta, em pontos de indice
   tamanho_contrato: 1.0
 

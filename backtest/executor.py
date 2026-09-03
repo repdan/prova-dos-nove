@@ -77,7 +77,7 @@ class ExecutorSimulado(Executor):
                  comissao_por_lote: float, valor_ponto_por_lote: float,
                  usar_spread_do_candle: bool = True,
                  swap_compra: float = 0.0, swap_venda: float = 0.0,
-                 dia_swap_triplo: int = 4):
+                 dia_swap_triplo: int = 4, spread_forcado: float | None = None):
         self.spread_padrao = spread_padrao
         self.slippage = slippage
         self.comissao_por_lote = comissao_por_lote
@@ -86,6 +86,8 @@ class ExecutorSimulado(Executor):
         self.swap_compra = swap_compra
         self.swap_venda = swap_venda
         self.dia_swap_triplo = dia_swap_triplo
+        # Quando preenchido, ignora o spread historico e usa este em tudo.
+        self.spread_forcado = spread_forcado
         self.trades: list[Trade] = []
 
     def _swap(self, posicao: Posicao, saida: datetime) -> tuple[int, float]:
@@ -121,6 +123,8 @@ class ExecutorSimulado(Executor):
         ele nao e constante: alarga na abertura e em noticia, que e justamente
         quando a estrategia mais dispara sinal.
         """
+        if self.spread_forcado is not None:
+            return self.spread_forcado
         if self.usar_spread_do_candle and candle.spread > 0:
             return candle.spread
         return self.spread_padrao

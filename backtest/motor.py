@@ -253,6 +253,7 @@ def montar_do_config(cfg, caminho_pregao=None, caminho_menor=None,
         swap_compra=cfg.get("custos.swap_compra_indice", 0.0),
         swap_venda=cfg.get("custos.swap_venda_indice", 0.0),
         dia_swap_triplo=cfg.get("custos.dia_swap_triplo", 4),
+        spread_forcado=cfg.get("custos.spread_forcado"),
     )
 
     motor = Motor(
