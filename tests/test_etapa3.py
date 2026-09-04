@@ -274,3 +274,51 @@ def test_metricas_batem_com_trades_construidos_a_mao():
     assert m.fator_lucro == pytest.approx(1.0)
     assert m.maior_perda == pytest.approx(-20.0)
     assert m.drawdown_maximo_pontos == pytest.approx(20.0)
+
+
+# ------------------------------------------------------- politica de inversao
+
+def cenario_de_inversao():
+    """Candles em que a saida de uma compra NAO satisfaz a regra de entrada.
+
+    O preco fica acima do canal e depois desaba atravessando tudo: o candle
+    anterior estava FORA (acima), entao a regra de dentro-para-fora nao permite
+    a venda. E o caso das 369 saidas sem inversao no historico real.
+    """
+    saida = DecisaoSaida(sair=True, motivo="rompimento_media_oposta")
+    return EstrategiaRoteirizada(entradas={0: Sinal.COMPRA}, saidas={2: saida})
+
+
+def test_politica_regra_nao_inverte_quando_a_estrategia_nao_da_sinal():
+    e = cenario_de_inversao()
+    motor = Motor(e, novo_executor(), politica_inversao="regra")
+    r = motor.rodar(FeedLista([candle(i, 101, 99, 100) for i in range(5)]))
+    assert len(r.trades) == 1
+    assert r.inversoes_forcadas == 0
+
+
+def test_politica_sempre_inverte_mesmo_sem_sinal_da_estrategia():
+    e = cenario_de_inversao()
+    motor = Motor(e, novo_executor(), politica_inversao="sempre")
+    r = motor.rodar(FeedLista([candle(i, 101, 99, 100) for i in range(5)]))
+
+    assert r.inversoes_forcadas == 1
+    # A posicao aberta pela inversao nao fecha ate o fim da base, entao segue
+    # existindo apenas o trade original - mas o sinal foi gerado.
+    assert r.sinais_gerados == 2
+
+
+def test_politica_nunca_bloqueia_a_inversao_que_a_regra_permitiria():
+    saida = DecisaoSaida(sair=True, motivo="rompimento_media_oposta")
+    e = EstrategiaRoteirizada(entradas={0: Sinal.COMPRA, 2: Sinal.VENDA},
+                              saidas={2: saida})
+    motor = Motor(e, novo_executor(), politica_inversao="nunca")
+    r = motor.rodar(FeedLista([candle(i, 101, 99, 100) for i in range(5)]))
+
+    assert r.inversoes_bloqueadas == 1
+    assert len(r.trades) == 1, "a venda do candle 2 deveria ter sido bloqueada"
+
+
+def test_politica_invalida_falha_na_criacao():
+    with pytest.raises(ValueError, match="politica_inversao"):
+        Motor(cenario_de_inversao(), novo_executor(), politica_inversao="talvez")

@@ -150,6 +150,20 @@ backtest:
   # lado para a escolha sair de numero, nao de intuicao.
   fechar_no_fim_do_pregao: false
 
+  # O QUE FAZER QUANDO UMA POSICAO E ENCERRADA PELO ROMPIMENTO OPOSTO
+  #
+  # Medido em 03/09/2026: das 1.211 saidas, 841 (69%) viraram entrada
+  # contraria no mesmo candle e 369 (30%) nao. A diferenca nao e aleatoria - e
+  # a propria regra de entrada: quando o preco vinha CAVALGANDO FORA do canal
+  # e um unico candle atravessa o canal inteiro, o candle anterior nao estava
+  # "dentro", e a regra de dentro-para-fora bloqueia a entrada nova.
+  #
+  #   regra  - deixa a regra decidir (comportamento atual: inverte em 69%)
+  #   sempre - inverte em toda saida, mesmo sem passar pelo canal
+  #   nunca  - nunca inverte no mesmo candle; espera o preco voltar para
+  #            dentro do canal e romper de novo
+  politica_inversao: "regra"
+
 # -----------------------------------------------------------------------------
 # ESTRATEGIA
 # -----------------------------------------------------------------------------

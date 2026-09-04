@@ -38,6 +38,8 @@ class ResultadoBacktest:
     sinais_gerados: int = 0
     sinais_ignorados_posicao_aberta: int = 0
     fechamentos_por_fim_de_pregao: int = 0
+    inversoes_forcadas: int = 0
+    inversoes_bloqueadas: int = 0
     stops_catastroficos: int = 0
     desempates_intrabar: int = 0
     parametros: dict[str, Any] = field(default_factory=dict)
@@ -59,7 +61,8 @@ class Motor:
                  fechar_no_fim_do_pregao: bool = False,
                  stop_catastrofico_ativo: bool = False,
                  stop_catastrofico_atr: float = 3.0,
-                 permitir_simultaneas: bool = False):
+                 permitir_simultaneas: bool = False,
+                 politica_inversao: str = "regra"):
         self.estrategia = estrategia
         self.executor = executor
         self.contexto = contexto
@@ -72,6 +75,11 @@ class Motor:
         # simular cada sinal isoladamente. Util para pesquisa, invalido para
         # medir patrimonio - por isso e explicito e nunca o padrao.
         self.permitir_simultaneas = permitir_simultaneas
+        if politica_inversao not in ("regra", "sempre", "nunca"):
+            raise ValueError(
+                f"politica_inversao invalida: {politica_inversao!r}. "
+                "Use 'regra', 'sempre' ou 'nunca'.")
+        self.politica_inversao = politica_inversao
 
     def rodar(self, feed: DataFeed) -> ResultadoBacktest:
         resultado = ResultadoBacktest(parametros={
@@ -81,6 +89,7 @@ class Motor:
             "periodo_canal": getattr(self.estrategia, "periodo_canal", None),
             "lote": getattr(self.estrategia, "lote", None),
             "fechar_no_fim_do_pregao": self.fechar_no_fim_do_pregao,
+            "politica_inversao": self.politica_inversao,
             "stop_catastrofico_ativo": self.stop_catastrofico_ativo,
             "feed": feed.descricao,
         })
@@ -104,15 +113,31 @@ class Motor:
                 abertas = []
 
             # --- posicoes abertas: acompanhar e avaliar saida ---
-            sobreviventes = []
+            sobreviventes, encerradas = [], []
             for posicao in abertas:
                 self.executor.acompanhar(posicao, candle)
-                if not self._avaliar_saida(posicao, candle, resultado):
+                if self._avaliar_saida(posicao, candle, resultado):
+                    encerradas.append(posicao)
+                else:
                     sobreviventes.append(posicao)
             abertas = sobreviventes
 
             # --- sempre alimenta a estrategia, mesmo com posicao aberta ---
             sinal = self.estrategia.on_candle(candle)
+
+            # A politica de inversao age SOBRE o sinal da estrategia, nunca
+            # dentro dela: a estrategia continua sendo a mesma nas tres
+            # variantes, o que muda e o que se faz com o sinal.
+            if encerradas and not self.permitir_simultaneas:
+                if self.politica_inversao == "nunca" and sinal is not Sinal.NENHUM:
+                    resultado.inversoes_bloqueadas += 1
+                    sinal = Sinal.NENHUM
+                elif self.politica_inversao == "sempre" and sinal is Sinal.NENHUM:
+                    # Inverte o lado da posicao que acabou de fechar.
+                    fechada = encerradas[-1]
+                    sinal = (Sinal.VENDA if fechada.direcao is Direcao.COMPRADO
+                             else Sinal.COMPRA)
+                    resultado.inversoes_forcadas += 1
 
             if sinal is not Sinal.NENHUM:
                 resultado.sinais_gerados += 1
@@ -259,6 +284,7 @@ def montar_do_config(cfg, caminho_pregao=None, caminho_menor=None,
     motor = Motor(
         estrategia, executor, contexto, resolvedor,
         fechar_no_fim_do_pregao=cfg.get("backtest.fechar_no_fim_do_pregao", False),
+        politica_inversao=cfg.get("backtest.politica_inversao", "regra"),
         stop_catastrofico_ativo=cfg.get("estrategia.stop_catastrofico_ativo", False),
         stop_catastrofico_atr=cfg.get("estrategia.stop_catastrofico_atr", 3.0),
     )
