@@ -54,39 +54,60 @@ def carregar() -> tuple[dict[str, pd.DataFrame], dict[str, Especificacao]]:
 
 
 def metricas(res, capital: float) -> dict:
+    """Metricas em MULTIPLOS DE RISCO (R), nao em dolares.
+
+    Por que R e nao dolar: dimensionando por % do capital, o tamanho da posicao
+    varia centenas de vezes ao longo de um teste longo. Somar dolares faz os
+    trades do fim valerem 1.000x os do inicio, e o "fator de lucro" resultante
+    descreve o efeito do juro composto, nao a qualidade da estrategia.
+
+    1 R = o que se perde se o stop for atingido. Um trade de +2R ganhou o dobro
+    do que arriscou, tenha sido em 1995 ou em 2025.
+    """
     q = res.quadro
     if q.empty:
         return {}
+    # R de cada trade. risco_planejado e o que se perderia no stop.
+    r = q["resultado_usd"] / q["risco_planejado"].replace(0, np.nan)
+    r = r.dropna()
+    if r.empty:
+        return {}
+
+    ganhos, perdas = r[r > 0], r[r <= 0]
     p = res.patrimonio["patrimonio"]
-    ret = p.pct_change().dropna()
     pico = p.cummax()
     anos = max((p.index[-1] - p.index[0]).days / 365.25, 0.01)
-    ganhos = q[q["resultado_usd"] > 0]["resultado_usd"]
-    perdas = q[q["resultado_usd"] <= 0]["resultado_usd"]
+
     return {
-        "trades": len(q), "acerto": (q["resultado_usd"] > 0).mean(),
-        "final": p.iloc[-1], "retorno": p.iloc[-1] / capital - 1,
-        "cagr": (p.iloc[-1] / capital) ** (1 / anos) - 1,
+        "trades": len(r), "acerto": float((r > 0).mean()),
+        "r_total": float(r.sum()), "r_medio": float(r.mean()),
+        "r_por_ano": float(r.sum() / anos),
+        "fator": (float(ganhos.sum() / abs(perdas.sum()))
+                  if len(perdas) and perdas.sum() else float("inf")),
+        "maior_ganho": float(r.max()), "maior_perda": float(r.min()),
+        # Erro padrao da media em R: diz se o resultado se distingue de zero.
+        "erro": float(r.std() / np.sqrt(len(r))),
         "dd": float(-((p - pico) / pico).min()),
-        "sharpe": float(ret.mean() / ret.std() * np.sqrt(252)) if ret.std() else 0.0,
-        "fator": float(ganhos.sum() / abs(perdas.sum())) if len(perdas) else float("inf"),
-        "anos": anos, "por_ano": len(q) / anos,
-        "abaixo_min": q["lote_abaixo_do_minimo"].mean(),
+        "anos": anos,
+        "abaixo_min": float(q["lote_abaixo_do_minimo"].mean()),
     }
 
 
 def linha(rot: str, m: dict) -> None:
     if not m:
         print(f"  {rot:<26} (sem trades)"); return
-    print(f"  {rot:<26}{m['trades']:>7}{m['acerto']:>8.0%}{m['retorno']:>10.1%}"
-          f"{m['cagr']:>9.1%}{m['dd']:>9.1%}{m['fator']:>7.2f}{m['sharpe']:>8.2f}"
-          f"{m['abaixo_min']:>10.0%}")
+    # Um resultado so se distingue de zero se a media for maior que ~2 erros.
+    sigmas = abs(m["r_medio"]) / m["erro"] if m["erro"] else 0
+    selo = "significativo" if sigmas > 2 else ("fraco" if sigmas > 1 else "ruido")
+    print(f"  {rot:<26}{m['trades']:>7}{m['acerto']:>8.0%}{m['r_total']:>9.1f}"
+          f"{m['r_medio']:>9.3f}{m['erro']:>9.3f}{sigmas:>8.1f}"
+          f"{m['fator']:>7.2f}{m['abaixo_min']:>9.0%}  {selo}")
 
 
 def cabecalho() -> None:
-    print(f"  {'configuracao':<26}{'trades':>7}{'acerto':>8}{'retorno':>10}"
-          f"{'CAGR':>9}{'drawdown':>9}{'fator':>7}{'sharpe':>8}{'lote min':>10}")
-    print("  " + "-" * 86)
+    print(f"  {'configuracao':<26}{'trades':>7}{'acerto':>8}{'R total':>9}"
+          f"{'R medio':>9}{'erro':>9}{'sigmas':>8}{'fator':>7}{'lote min':>9}")
+    print("  " + "-" * 94)
 
 
 def main() -> int:
@@ -97,6 +118,14 @@ def main() -> int:
     dados, specs = carregar()
     if not dados:
         print("  Nenhum mercado carregado."); return 1
+
+    # Antes de 1995 so existem 3 mercados na base. Chamar isso de "carteira
+    # diversificada" seria medir outra coisa - o beneficio da estrategia vem
+    # justamente de somar muitas apostas independentes.
+    CORTE = pd.Timestamp("1995-01-01", tz="UTC")
+    dados = {m: df[df["tempo_ativo"] >= CORTE].reset_index(drop=True)
+             for m, df in dados.items()}
+    dados = {m: df for m, df in dados.items() if len(df) > 500}
 
     inicio = min(df["tempo_ativo"].min() for df in dados.values())
     fim = max(df["tempo_ativo"].max() for df in dados.values())

@@ -88,7 +88,7 @@ class BacktestCarteira:
     def __init__(self, criar_estrategia, especificacoes: dict[str, Especificacao],
                  capital_inicial: float = 10_000.0,
                  risco_por_trade: float = 0.01,
-                 slippage_em_atr: float = 0.05,
+                 slippage_em_spreads: float = 1.0,
                  comissao_por_lote: float = 0.1,
                  aceitar_lote_minimo: bool = True,
                  max_posicoes: int | None = None):
@@ -96,7 +96,11 @@ class BacktestCarteira:
         self.specs = especificacoes
         self.capital_inicial = capital_inicial
         self.risco_por_trade = risco_por_trade
-        self.slippage_em_atr = slippage_em_atr
+        # Derrapagem como multiplo do SPREAD, nao do ATR. Medir derrapagem em
+        # fracao do ATR parece prudente e nao e: no GER40, 5% do ATR diario
+        # equivalem a 86 vezes o spread. Numa ordem a mercado em ativo liquido a
+        # derrapagem e da ordem do spread; 1.0 ja e conservador.
+        self.slippage_em_spreads = slippage_em_spreads
         self.comissao_por_lote = comissao_por_lote
         # Quando o tamanho calculado fica abaixo do lote minimo: operar o
         # minimo (aceitando risco maior) ou desistir do trade.
@@ -182,7 +186,7 @@ class BacktestCarteira:
                 direcao = (Direcao.COMPRADO if sinal is Sinal.COMPRA
                            else Direcao.VENDIDO)
                 mult = direcao.multiplicador
-                custo_entrada = spec.spread / 2 + self.slippage_em_atr * atr
+                custo_entrada = spec.spread * (0.5 + self.slippage_em_spreads)
                 preco_entrada = candle.fechamento + mult * custo_entrada
 
                 abertas[mercado] = {
@@ -228,7 +232,7 @@ class BacktestCarteira:
     def _encerrar(self, res: ResultadoCarteira, pos: dict, mercado: str,
                   spec: Especificacao, dia, preco_bruto: float, motivo: str) -> float:
         mult = pos["direcao"].multiplicador
-        custo_saida = spec.spread / 2 + self.slippage_em_atr * pos["atr"]
+        custo_saida = spec.spread * (0.5 + self.slippage_em_spreads)
         preco_saida = preco_bruto - mult * custo_saida
 
         pontos = (preco_saida - pos["preco"]) * mult
