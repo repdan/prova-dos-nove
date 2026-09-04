@@ -38,6 +38,7 @@ class ResultadoBacktest:
     sinais_gerados: int = 0
     sinais_ignorados_posicao_aberta: int = 0
     fechamentos_por_fim_de_pregao: int = 0
+    stops_da_estrategia: int = 0
     inversoes_forcadas: int = 0
     inversoes_bloqueadas: int = 0
     stops_catastroficos: int = 0
@@ -164,7 +165,11 @@ class Motor:
             ordem = self.contexto.registrar_sinal()
             ctx.update(self.contexto.contexto(candle, ordem))
 
-        return self.executor.abrir(direcao, candle, self.estrategia.lote, ctx)
+        posicao = self.executor.abrir(direcao, candle, self.estrategia.lote, ctx)
+        armar = getattr(self.estrategia, "armar_stop", None)
+        if armar is not None:
+            armar(posicao, candle)
+        return posicao
 
     def _nivel_stop_catastrofico(self, posicao) -> float | None:
         """Rede de seguranca opcional, desligada por padrao.
@@ -211,6 +216,17 @@ class Motor:
         nivel_stop = self._nivel_stop_catastrofico(posicao)
         stop_tocado = nivel_stop is not None and (
             candle.minima <= nivel_stop if comprado else candle.maxima >= nivel_stop)
+
+        # O stop da estrategia e avaliado PRIMEIRO: dentro de um candle ele e
+        # o evento mais proximo do preco de entrada, entao acontece antes.
+        checar = getattr(self.estrategia, "checar_stop", None)
+        if checar is not None:
+            d_stop = checar(posicao, candle)
+            if d_stop.sair:
+                resultado.stops_da_estrategia += 1
+                self.executor.fechar(posicao, candle, d_stop.motivo,
+                                     d_stop.preco_sugerido)
+                return True
 
         decisao = self.estrategia.deve_sair(posicao, candle)
         alvo = decisao.preco_sugerido if decisao.sair else None
@@ -286,6 +302,10 @@ def montar_do_config(cfg, caminho_pregao=None, caminho_menor=None,
         filtro_volume_ativo=cfg.get("estrategia.filtro_volume_ativo", False),
         filtro_volume_janela=cfg.get("estrategia.filtro_volume_janela", 100),
         filtro_volume_limiar=cfg.get("estrategia.filtro_volume_limiar", 0.88),
+        tipo_stop=cfg.get("estrategia.tipo_stop", "nenhum"),
+        stop_mult_atr=cfg.get("estrategia.stop_mult_atr", 2.5),
+        stop_folga_atr=cfg.get("estrategia.stop_folga_atr", 0.25),
+        stop_breakeven_atr=cfg.get("estrategia.stop_breakeven_atr"),
         prever_probabilidade=prever_probabilidade,
     )
 

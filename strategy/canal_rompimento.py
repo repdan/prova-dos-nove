@@ -35,6 +35,7 @@ from typing import Any, Callable
 
 from strategy.base import Candle, DecisaoSaida, Direcao, Estrategia, Posicao, Sinal
 from strategy.indicadores import ATR, Extremo, MediaMovel
+from strategy.stops import Stop
 
 
 class ModoSaida(Enum):
@@ -87,6 +88,10 @@ class CanalRompimento(Estrategia):
         filtro_volume_ativo: bool = False,
         filtro_volume_janela: int = 100,
         filtro_volume_limiar: float = 0.88,
+        tipo_stop: str = "nenhum",
+        stop_mult_atr: float = 2.5,
+        stop_folga_atr: float = 0.25,
+        stop_breakeven_atr: float | None = None,
         prever_probabilidade: Callable[[dict[str, Any]], float] | None = None,
     ):
         self.periodo_canal = periodo_canal
@@ -98,6 +103,8 @@ class CanalRompimento(Estrategia):
         self.preco_referencia = preco_referencia
         self.filtro_volume_ativo = filtro_volume_ativo
         self.filtro_volume_limiar = filtro_volume_limiar
+        self.stop = Stop(tipo_stop, stop_mult_atr, stop_folga_atr,
+                         stop_breakeven_atr)
         # Injetado pela Etapa 4. A estrategia nao sabe o que e um modelo -
         # so sabe pedir um numero entre 0 e 1 para uma funcao qualquer.
         self.prever_probabilidade = prever_probabilidade
@@ -200,6 +207,44 @@ class CanalRompimento(Estrategia):
         # Uma janela cheia forma o canal; a segunda garante que ja existe um
         # "candle anterior" com posicao conhecida para comparar.
         return self._banda_sup.cheia and self._posicao_anterior is not None
+
+    def armar_stop(self, posicao: Posicao, candle: Candle) -> None:
+        """Coloca a ordem de stop na mesa. Chamado pelo motor ao abrir posicao.
+
+        O canal usado e o do momento da entrada, congelado: um stop que
+        acompanhasse o canal seria um trailing, e ai seria outro tipo.
+        """
+        canal = self._canal_para(candle)
+        oposto = None
+        if canal is not None:
+            oposto = (canal.inferior if posicao.direcao is Direcao.COMPRADO
+                      else canal.superior)
+        nivel = self.stop.nivel_inicial(posicao, candle, self._atr.valor, oposto)
+        posicao.estado["nivel_stop"] = nivel
+        posicao.estado["stop_inicial"] = nivel
+
+    def checar_stop(self, posicao: Posicao, candle: Candle) -> DecisaoSaida:
+        """Avalia o stop ANTES de qualquer outra regra de saida.
+
+        Ordem importa: dentro de um mesmo candle o stop e o evento mais
+        proximo do preco de entrada, entao ele acontece primeiro. Avaliar a
+        saida da estrategia antes deixaria o trade sair no fechamento em casos
+        em que o stop ja teria disparado no meio do caminho.
+        """
+        if not self.stop.ativo:
+            return DecisaoSaida(sair=False)
+
+        nivel = self.stop.atualizar(posicao, candle, self._atr.valor)
+        if not self.stop.foi_atingido(posicao, candle, nivel):
+            return DecisaoSaida(sair=False)
+
+        motivo = ("stop_breakeven" if posicao.estado.get("breakeven_acionado")
+                  and nivel is not None
+                  and abs(nivel - posicao.preco_entrada) < 1e-9
+                  else f"stop_{self.stop.tipo.value}")
+        return DecisaoSaida(sair=True, motivo=motivo,
+                            preco_sugerido=self.stop.preco_de_execucao(
+                                posicao, candle, nivel))
 
     # -------------------------------------------------------------- entrada
 
@@ -379,5 +424,9 @@ def criar_do_config(cfg, prever_probabilidade=None) -> CanalRompimento:
         filtro_volume_ativo=cfg.get("estrategia.filtro_volume_ativo", False),
         filtro_volume_janela=cfg.get("estrategia.filtro_volume_janela", 100),
         filtro_volume_limiar=cfg.get("estrategia.filtro_volume_limiar", 0.88),
+        tipo_stop=cfg.get("estrategia.tipo_stop", "nenhum"),
+        stop_mult_atr=cfg.get("estrategia.stop_mult_atr", 2.5),
+        stop_folga_atr=cfg.get("estrategia.stop_folga_atr", 0.25),
+        stop_breakeven_atr=cfg.get("estrategia.stop_breakeven_atr"),
         prever_probabilidade=prever_probabilidade,
     )

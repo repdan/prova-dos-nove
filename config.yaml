@@ -222,8 +222,45 @@ estrategia:
   filtro_volume_janela: 100      # candles da media de referencia
   filtro_volume_limiar: 0.70     # razao maxima para o sinal valer
 
-  # Rede de seguranca DESLIGADA por padrao: a estrategia base nao tem stop loss,
-  # e mudar isso e decisao sua, nao minha.
+  # -------------------------------------------------------------------------
+  # STOP - ate onde aceitar estar errado
+  #
+  #   nenhum          sem stop (regra base original)
+  #   atr             entrada -/+ stop_mult_atr x ATR
+  #   candle_entrada  extremo contrario do candle do sinal, menos a folga
+  #   canal_externo   banda oposta do canal na entrada, menos a folga
+  #   trailing_forca  como o atr, mas acompanha o preco sem afrouxar
+  #
+  # stop_breakeven_atr: depois desse tanto de ATR a favor, o stop vai para o
+  # preco de entrada e o trade deixa de poder perder. null desliga.
+  # -------------------------------------------------------------------------
+  # Medido em 03/09/2026, periodo de teste, com o filtro de volume ligado:
+  #   nenhum          1.14      candle_entrada folga 0.25   1.02  <- apertado
+  #   atr 1.00        1.03      candle_entrada folga 1.0    1.17
+  #   atr 1.50        1.23      canal_externo folga 0.25    1.19
+  #   atr 1.75        1.23      canal_externo folga 1.0     1.19
+  #   atr 2.00        1.21      trailing_forca 2.5x         0.73  <- destroi
+  #   atr 2.50        1.20      trailing_forca 4.0x         0.95
+  #   atr 4.00        1.18      breakeven em 1 ATR          0.84  <- destroi
+  #
+  # 2.0 e o MEIO do plato 1.5-2.5, nao o pico. Escolher pico e como escolher
+  # o periodo 160.
+  #
+  # Por que trailing e breakeven falham, apesar de parecerem prudentes:
+  #   trailing 2.5x -> ganho medio cai de 257 para 156, e os 10 melhores
+  #                    trades encolhem 41%. Ele corta a cauda que paga tudo.
+  #   breakeven     -> os vencedores caem de 228 para 130. O stop no zero a
+  #                    zero e atingido antes de o movimento se desenvolver.
+  #   atr 1.5x      -> ganho medio 256 (era 257), top 10 identicos, e a perda
+  #                    media cai de 145 para 111. Corta perda sem tocar ganho.
+  tipo_stop: "atr"
+  stop_mult_atr: 2.0
+  stop_folga_atr: 0.25
+  stop_breakeven_atr: null
+
+  # OBSOLETO - substituido por 'tipo_stop' acima, que congela o ATR no momento
+  # da entrada em vez de recalcular o nivel a cada candle. Mantido desligado
+  # para nao existirem dois stops simultaneos.
   #
   # O que a medicao diz (com o filtro de volume ligado, periodo de teste):
   #   sem stop  fator 1.14
