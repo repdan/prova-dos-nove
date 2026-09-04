@@ -347,7 +347,11 @@ mercados:
       simbolo: "XAUUSD"
     coleta:
       pasta_saida: "data/historico/XAUUSD"
-      timeframes: ["M15", "M5"]
+      # H1 primeiro: medido em 04/09/2026, o ouro nao tem sinal em M15 nem no
+      # resultado BRUTO (-2.645 pontos), e passa a ter em H1 (+4.084). O efeito
+      # e monotonico no timeframe, coerente com o que se sabe de trend
+      # following - o movimento precisa ser grande em relacao ao ruido.
+      timeframes: ["H1", "M15", "M5"]
       data_inicial: "1998-01-01"
     pregao:
       tipo: "continuo"

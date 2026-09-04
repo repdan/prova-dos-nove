@@ -1,5 +1,5 @@
 {
-  "gerado_em_utc": "2026-09-04T03:07:16.434680+00:00",
+  "gerado_em_utc": "2026-09-04T03:14:01.351144+00:00",
   "simbolo": "XAUUSD",
   "terminal": {
     "terminal_build": 6140,
@@ -38,6 +38,52 @@
     }
   ],
   "timeframes": {
+    "H1": {
+      "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\XAUUSD\\XAUUSD_H1_bruto.parquet",
+      "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\XAUUSD\\XAUUSD_H1_pregao.parquet",
+      "inicio": "2017-01-02 22:00:00+00:00",
+      "fim": "2026-09-04 03:00:00+00:00",
+      "anos": 9.67,
+      "qualidade": {
+        "candles_brutos": 71751,
+        "candles_pregao": 58462,
+        "removidos_ohlc_invalido": 0,
+        "removidos_volume_zero": 0,
+        "removidos_fora_pregao": 0,
+        "removidos_dia_nao_negociado": 340,
+        "duplicados": 0,
+        "dias_descartados_por_densidade": 0,
+        "candles_descartados_por_densidade": 0,
+        "candles_antes_do_corte_inicial": 12949,
+        "primeiro_dia_utilizavel": "2017-01-02",
+        "buracos_intra_sessao": 0,
+        "maior_buraco_candles": 3,
+        "detalhe_maiores_buracos": [
+          {
+            "quando": "2017-07-04 21:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2019-01-21 22:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2019-02-18 22:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2019-05-27 21:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2019-07-04 21:00:00+00:00",
+            "candles_faltando": 3
+          }
+        ],
+        "dias_negociados": 3011,
+        "candles_por_dia_mediana": 23.0
+      }
+    },
     "M15": {
       "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\XAUUSD\\XAUUSD_M15_bruto.parquet",
       "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\XAUUSD\\XAUUSD_M15_pregao.parquet",
@@ -88,11 +134,11 @@
       "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\XAUUSD\\XAUUSD_M5_bruto.parquet",
       "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\XAUUSD\\XAUUSD_M5_pregao.parquet",
       "inicio": "2017-01-02 22:00:00+00:00",
-      "fim": "2026-09-04 03:05:00+00:00",
+      "fim": "2026-09-04 03:10:00+00:00",
       "anos": 9.67,
       "qualidade": {
-        "candles_brutos": 683427,
-        "candles_pregao": 670138,
+        "candles_brutos": 683428,
+        "candles_pregao": 670139,
         "removidos_ohlc_invalido": 0,
         "removidos_volume_zero": 0,
         "removidos_fora_pregao": 0,
