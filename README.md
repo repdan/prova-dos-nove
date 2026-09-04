@@ -92,6 +92,33 @@ Toda linha removida vai para o relatório de qualidade com o motivo, e o arquivo
 
 ---
 
+## Estado: HK50 congelado, projeto migrando para mercado contínuo
+
+O trabalho no HK50 está **completo e preservado** na tag `hk50-final`. Ele
+continua rodando: `git checkout hk50-final` reproduz tudo.
+
+**Por que migramos.** A métrica que decide se esta estratégia sobrevive num
+instrumento é quanto de um candle típico o custo de um giro consome. Medido
+nos 304 símbolos líquidos da corretora:
+
+| Instrumento | Giro ÷ ATR (hoje) | Posição |
+|---|---|---|
+| EURUSD | ~0,0% | 1º |
+| GER40 | 0,7% | 2º |
+| XAUUSD | 2,1% | 4º |
+| **HK50** | **22,0%** | **151º de 304** |
+
+Um giro no HK50 em M15 consome quase um quarto de um candle inteiro. A
+estratégia não estava errada — o terreno era hostil. O melhor resultado que
+conseguimos lá (fator 1,15, Sharpe 0,81) foi obtido no instrumento errado.
+
+**Fica registrado para o futuro:** o HK50 tem volume alto e movimento rápido.
+Ele pode servir a uma estratégia de scalping com custo por trade muito menor,
+ou a uma que opere menos vezes e capture movimentos maiores. Não é o ativo,
+é a combinação ativo + estratégia + timeframe.
+
+---
+
 ## O que a Etapa 1 encontrou (execução de 02/09/2026)
 
 **Símbolo:** `HK50` — Hong Kong 50 Index · servidor `Corretora-Demo` · conta DEMO
