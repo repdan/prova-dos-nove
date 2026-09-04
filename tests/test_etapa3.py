@@ -322,3 +322,31 @@ def test_politica_nunca_bloqueia_a_inversao_que_a_regra_permitiria():
 def test_politica_invalida_falha_na_criacao():
     with pytest.raises(ValueError, match="politica_inversao"):
         Motor(cenario_de_inversao(), novo_executor(), politica_inversao="talvez")
+
+
+def test_stop_que_sofre_gap_e_executado_na_abertura_e_nao_no_nivel():
+    """Stop garante execucao, nao preco.
+
+    Entrada em 100, ATR 10, stop a 3x = 70. O candle seguinte ABRE em 50, ja
+    abaixo do stop. A execucao tem que sair em 50 - assumir 70 inventaria 20
+    pontos que ninguem teria conseguido.
+    """
+    e = EstrategiaRoteirizada(entradas={0: Sinal.COMPRA}, saidas={}, atr=10.0)
+    motor = Motor(e, novo_executor(spread=0.0, slippage=0.0),
+                  stop_catastrofico_ativo=True, stop_catastrofico_atr=3.0)
+    com_gap = candle(1, maxima=55, minima=40, fechamento=45, abertura=50)
+    r = motor.rodar(FeedLista([candle(0, 101, 99, 100), com_gap]))
+
+    assert r.stops_catastroficos == 1
+    assert r.trades[0].preco_saida == pytest.approx(50.0), \
+        "o stop foi preenchido no nivel, ignorando o gap de abertura"
+
+
+def test_stop_sem_gap_continua_saindo_no_nivel():
+    e = EstrategiaRoteirizada(entradas={0: Sinal.COMPRA}, saidas={}, atr=10.0)
+    motor = Motor(e, novo_executor(spread=0.0, slippage=0.0),
+                  stop_catastrofico_ativo=True, stop_catastrofico_atr=3.0)
+    # Abre em 99 (acima do stop de 70) e so depois cai ate 60.
+    normal = candle(1, maxima=100, minima=60, fechamento=65, abertura=99)
+    r = motor.rodar(FeedLista([candle(0, 101, 99, 100), normal]))
+    assert r.trades[0].preco_saida == pytest.approx(70.0)

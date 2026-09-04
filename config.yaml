@@ -193,7 +193,53 @@ estrategia:
 
   periodo_atr: 14              # so para features de contexto do ML
 
-  # Rede de seguranca DESLIGADA por padrao: a estrategia base nao tem stop loss.
-  # Serve para medir qual seria a perda maxima por trade se houvesse um limite.
+  # -------------------------------------------------------------------------
+  # FILTRO DE VOLUME
+  #
+  # Descoberto em 03/09/2026 varrendo 23 indicadores: o volume do candle
+  # ANTERIOR ao rompimento, relativo a media dos ultimos 100 candles, e a
+  # unica medida que separa trade bom de ruim de forma consistente. E o
+  # sentido e o inverso do esperado - volume BAIXO antes do rompimento e o
+  # que da certo. A leitura provavel: volume alto antes e climax, exaustao de
+  # um movimento que ja aconteceu; volume baixo e mercado que ainda nao reagiu.
+  #
+  # Validado em walk-forward de 44 meses (limiar do passado, teste no mes
+  # seguinte): fator de lucro passa de 1.02 para 1.20, e os trades descartados
+  # ficam em 0.87 - o filtro separa, nao apenas encolhe a amostra.
+  #
+  # O limiar de 0.88 e a mediana dos limiares que o walk-forward escolheu ao
+  # longo dos 44 meses (faixa 0.84 a 0.91). Rompimento so vale se o volume do
+  # candle anterior estiver ABAIXO desse multiplo da media.
+  # -------------------------------------------------------------------------
+  # O limiar de 0.70 NAO e o pico da varredura - e o meio de um plato largo.
+  # Medido no periodo de teste (fora dos 12 meses iniciais): 0.50 da 1.19,
+  # 0.60 da 1.14, 0.70 da 1.14, 0.80 da 1.09, sem filtro da 1.03. Escolher o
+  # pico seria repetir o erro do periodo 160; escolher o meio de um plato
+  # amplo e o que costuma sobreviver. Reescolher o limiar todo mes foi testado
+  # e e PIOR que fixar (+958 pontos contra +5.786) - o adaptativo persegue
+  # ruido.
+  filtro_volume_ativo: true
+  filtro_volume_janela: 100      # candles da media de referencia
+  filtro_volume_limiar: 0.70     # razao maxima para o sinal valer
+
+  # Rede de seguranca DESLIGADA por padrao: a estrategia base nao tem stop loss,
+  # e mudar isso e decisao sua, nao minha.
+  #
+  # O que a medicao diz (com o filtro de volume ligado, periodo de teste):
+  #   sem stop  fator 1.14
+  #   2.0 x ATR fator 1.19
+  #   2.5 x ATR fator 1.21
+  #   3.0 x ATR fator 1.17
+  #   4.0 x ATR fator 1.17
+  #   1.0 x ATR fator 1.00   <- apertado demais: o gap atravessa
+  #
+  # O ganho e modesto e vem do lugar certo: a perda media cai de 145 para 133
+  # enquanto o ganho medio quase nao se move (257 -> 256). O plato 2.0-4.0 e
+  # largo, o que da confianca; abaixo de 1.5 o stop vira prejuizo.
+  #
+  # ATENCAO: o stop e executado no PIOR entre o nivel e a abertura do candle,
+  # porque stop garante execucao e nao preco. Assumir preenchimento no nivel
+  # exato inflava o resultado de fator 1.12 para 1.39 - mais da metade do
+  # ganho era ficcao de execucao.
   stop_catastrofico_ativo: false
   stop_catastrofico_atr: 3.0

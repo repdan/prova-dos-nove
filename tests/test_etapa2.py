@@ -251,3 +251,70 @@ def test_donchian_usa_extremos_e_nao_medias():
 def test_tipo_de_canal_invalido_falha_na_criacao():
     with pytest.raises(ValueError, match="tipo_canal"):
         nova(tipo_canal="bollinger")
+
+
+# ---------------------------------------------------------- filtro de volume
+
+def candle_com_volume(indice: int, maxima: float, minima: float,
+                      fechamento: float, volume: float) -> Candle:
+    return Candle(tempo=INICIO + timedelta(minutes=15 * indice),
+                  abertura=(maxima + minima) / 2, maxima=maxima, minima=minima,
+                  fechamento=fechamento, volume=volume)
+
+
+def encher_com_volume(e: CanalRompimento, volume_base: float = 1000.0,
+                      quantos: int = 120) -> int:
+    for i in range(quantos):
+        e.on_candle(candle_com_volume(i, 100, 90, 95, volume_base))
+    return quantos
+
+
+def test_filtro_de_volume_desligado_nao_muda_nada():
+    e = nova(filtro_volume_ativo=False, filtro_volume_janela=20)
+    n = encher_com_volume(e, quantos=PERIODO + 1)
+    # Candle anterior com volume altissimo nao deveria importar.
+    e.on_candle(candle_com_volume(n, 99, 92, 95, volume=99_999))
+    assert e.on_candle(candle_com_volume(n + 1, 102, 95, 101, 1000)) is Sinal.COMPRA
+
+
+def test_filtro_recusa_sinal_quando_o_candle_anterior_teve_volume_alto():
+    e = nova(filtro_volume_ativo=True, filtro_volume_janela=20,
+             filtro_volume_limiar=0.88)
+    n = encher_com_volume(e, volume_base=1000.0, quantos=PERIODO + 1)
+
+    # Candle anterior com volume 3x a media: o filtro deve barrar o rompimento.
+    e.on_candle(candle_com_volume(n, 99, 92, 95, volume=3000))
+    assert e.on_candle(candle_com_volume(n + 1, 102, 95, 101, 1000)) is Sinal.NENHUM
+    assert e.sinais_recusados_por_volume == 1
+
+
+def test_filtro_aprova_sinal_quando_o_candle_anterior_teve_volume_baixo():
+    e = nova(filtro_volume_ativo=True, filtro_volume_janela=20,
+             filtro_volume_limiar=0.88)
+    n = encher_com_volume(e, volume_base=1000.0, quantos=PERIODO + 1)
+
+    # Candle anterior com metade da media: passa folgado no limiar de 0.88.
+    e.on_candle(candle_com_volume(n, 99, 92, 95, volume=500))
+    assert e.on_candle(candle_com_volume(n + 1, 102, 95, 101, 1000)) is Sinal.COMPRA
+    assert e.sinais_recusados_por_volume == 0
+
+
+def test_filtro_usa_o_volume_do_candle_anterior_e_nao_o_do_rompimento():
+    """A distincao que o estudo mostrou valer 0.12 de fator de lucro."""
+    e = nova(filtro_volume_ativo=True, filtro_volume_janela=20,
+             filtro_volume_limiar=0.88)
+    n = encher_com_volume(e, volume_base=1000.0, quantos=PERIODO + 1)
+
+    # Anterior calmo, rompimento explosivo: tem que APROVAR.
+    e.on_candle(candle_com_volume(n, 99, 92, 95, volume=400))
+    assert e.on_candle(candle_com_volume(n + 1, 102, 95, 101,
+                                         volume=50_000)) is Sinal.COMPRA
+
+
+def test_filtro_deixa_passar_enquanto_nao_ha_media_de_volume():
+    """Sem referencia formada, recusar sinal descartaria o inicio da base."""
+    e = nova(filtro_volume_ativo=True, filtro_volume_janela=500,
+             filtro_volume_limiar=0.01)
+    n = encher_com_volume(e, quantos=PERIODO + 1)
+    e.on_candle(candle_com_volume(n, 99, 92, 95, volume=9_999))
+    assert e.on_candle(candle_com_volume(n + 1, 102, 95, 101, 1000)) is Sinal.COMPRA

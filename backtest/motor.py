@@ -183,6 +183,20 @@ class Motor:
         mult = posicao.direcao.multiplicador
         return posicao.preco_entrada - mult * (self.stop_catastrofico_atr * atr)
 
+    @staticmethod
+    def _preco_real_do_stop(candle: Candle, nivel: float, comprado: bool) -> float:
+        """Onde o stop REALMENTE seria executado.
+
+        Um stop nao garante preco, garante execucao. Se o candle abre alem do
+        nivel - gap de abertura, noticia, virada de pregao - a ordem e
+        executada na abertura, nao no nivel. Assumir preenchimento no preco
+        exato faz o stop parecer melhor do que e, e o erro cresce justamente
+        nos momentos em que ele mais importa.
+        """
+        if comprado:
+            return min(nivel, candle.abertura)
+        return max(nivel, candle.abertura)
+
     def _avaliar_saida(self, posicao, candle: Candle,
                        resultado: ResultadoBacktest) -> bool:
         """Decide e executa a saida. Devolve True se a posicao foi fechada.
@@ -204,7 +218,8 @@ class Motor:
         # Caso simples: so o stop dispara.
         if stop_tocado and alvo is None:
             resultado.stops_catastroficos += 1
-            self.executor.fechar(posicao, candle, "stop_catastrofico", nivel_stop)
+            self.executor.fechar(posicao, candle, "stop_catastrofico",
+                                 self._preco_real_do_stop(candle, nivel_stop, comprado))
             return True
 
         # Caso delicado: os dois niveis estao dentro do mesmo candle.
@@ -222,7 +237,8 @@ class Motor:
                 self.executor.fechar(posicao, candle, decisao.motivo, alvo)
             else:
                 resultado.stops_catastroficos += 1
-                self.executor.fechar(posicao, candle, "stop_catastrofico", nivel_stop)
+                self.executor.fechar(posicao, candle, "stop_catastrofico",
+                                     self._preco_real_do_stop(candle, nivel_stop, comprado))
             return True
 
         if decisao.sair:
@@ -267,6 +283,9 @@ def montar_do_config(cfg, caminho_pregao=None, caminho_menor=None,
         tipo_canal=cfg.get("estrategia.tipo_canal", "media"),
         preco_referencia=cfg.get("estrategia.preco_referencia", "fechamento"),
         periodo_atr=cfg.get("estrategia.periodo_atr", 14),
+        filtro_volume_ativo=cfg.get("estrategia.filtro_volume_ativo", False),
+        filtro_volume_janela=cfg.get("estrategia.filtro_volume_janela", 100),
+        filtro_volume_limiar=cfg.get("estrategia.filtro_volume_limiar", 0.88),
         prever_probabilidade=prever_probabilidade,
     )
 

@@ -175,6 +175,23 @@ A regra base **não será alterada** (é o baseline que o projeto quer medir), m
 
 ## Resultado do baseline (Etapa 3)
 
+**Configuração atual** — `stop_gain`, canal por média de 20, filtro de volume
+em 0,70, M15, 2022-02 a 2026-09, lote 0,01:
+
+| | Sem filtro | **Com filtro de volume** |
+|---|---|---|
+| Trades | 1.211 | **594** |
+| Acerto | 35% | **38%** |
+| Fator de lucro | 0,98 | **1,10** |
+| Pontos | −1.926 | **+5.568** |
+| Custo sobre o bruto | 108% | **56%** |
+| Sharpe | −0,10 | **0,59** |
+
+O filtro descarta o rompimento quando o candle ANTERIOR teve volume acima de
+0,70× a média dos últimos 100. Ver `analises/assinatura_lateral.py`.
+
+### Baseline original, para referência
+
 `stop_gain`, canal por média de 20, M15, 2022-02 a 2026-09, lote 0,01:
 
 | Modo de saída | Trades | Acerto | Fator de lucro | Pontos | Sharpe |

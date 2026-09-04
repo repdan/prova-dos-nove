@@ -84,6 +84,9 @@ class CanalRompimento(Estrategia):
         tipo_canal: str = "media",
         preco_referencia: str = "fechamento",
         periodo_atr: int = 14,
+        filtro_volume_ativo: bool = False,
+        filtro_volume_janela: int = 100,
+        filtro_volume_limiar: float = 0.88,
         prever_probabilidade: Callable[[dict[str, Any]], float] | None = None,
     ):
         self.periodo_canal = periodo_canal
@@ -93,6 +96,8 @@ class CanalRompimento(Estrategia):
         self.ml_limiar_saida = ml_limiar_saida
         self.tipo_canal = tipo_canal
         self.preco_referencia = preco_referencia
+        self.filtro_volume_ativo = filtro_volume_ativo
+        self.filtro_volume_limiar = filtro_volume_limiar
         # Injetado pela Etapa 4. A estrategia nao sabe o que e um modelo -
         # so sabe pedir um numero entre 0 e 1 para uma funcao qualquer.
         self.prever_probabilidade = prever_probabilidade
@@ -107,6 +112,11 @@ class CanalRompimento(Estrategia):
             raise ValueError(f"tipo_canal invalido: {tipo_canal!r}. Use 'media' ou 'donchian'.")
 
         self._atr = ATR(periodo_atr)
+        self._media_volume = MediaMovel(filtro_volume_janela)
+        # Volume do candle ANTERIOR dividido pela media dos candles que vieram
+        # antes DELE. Guardado no momento em que aquele candle foi absorvido -
+        # por isso ja esta pronto, e nao contamina a decisao com o candle atual.
+        self._volume_relativo: float | None = None
 
         # Estado entre candles
         self._posicao_anterior: PosicaoNoCanal | None = None
@@ -121,6 +131,7 @@ class CanalRompimento(Estrategia):
         # ordem, independentemente de qual o engine chamar primeiro.
         self._cache_tempo: Any = None
         self._cache_canal: Canal | None = None
+        self.sinais_recusados_por_volume = 0
 
     # ------------------------------------------------------------------ util
 
@@ -142,6 +153,19 @@ class CanalRompimento(Estrategia):
             self._cache_canal = self._canal_vigente()
         return self._cache_canal
 
+    def _volume_aprova(self) -> bool:
+        """O volume do candle anterior estava baixo o bastante?
+
+        Enquanto a media de volume nao encheu, o filtro deixa passar: recusar
+        sinal por falta de referencia descartaria os primeiros meses da base
+        sem motivo nenhum.
+        """
+        if not self.filtro_volume_ativo:
+            return True
+        if self._volume_relativo is None:
+            return True
+        return self._volume_relativo <= self.filtro_volume_limiar
+
     def _precos_de_referencia(self, candle: Candle) -> tuple[float, float]:
         """(preco para testar rompimento pra cima, idem pra baixo).
 
@@ -157,6 +181,13 @@ class CanalRompimento(Estrategia):
 
     def _absorver(self, candle: Candle) -> None:
         """Incorpora o candle aos indicadores. Sempre por ultimo."""
+        # A media e lida ANTES de receber este candle: assim o volume relativo
+        # guardado compara o candle com o passado dele, nunca consigo mesmo.
+        media_antes = self._media_volume.valor
+        self._volume_relativo = (candle.volume / media_antes
+                                 if media_antes else None)
+        self._media_volume.atualizar(candle.volume)
+
         self._sup_anterior = self._banda_sup.valor
         self._inf_anterior = self._banda_inf.valor
         self._banda_sup.atualizar(candle.maxima)
@@ -188,6 +219,12 @@ class CanalRompimento(Estrategia):
                 sinal = Sinal.COMPRA
             elif posicao_atual is PosicaoNoCanal.ABAIXO:
                 sinal = Sinal.VENDA
+
+        # O filtro age DEPOIS da regra, nunca no lugar dela: a estrategia
+        # continua a mesma, o filtro apenas recusa alguns dos sinais dela.
+        if sinal is not Sinal.NENHUM and not self._volume_aprova():
+            self.sinais_recusados_por_volume += 1
+            sinal = Sinal.NENHUM
 
         self._canal_anterior = canal
         self._posicao_anterior = posicao_atual
@@ -323,6 +360,7 @@ class CanalRompimento(Estrategia):
             "atr": self._atr.valor,
             "inclinacao_canal_superior": inclinacao_sup,
             "inclinacao_canal_inferior": inclinacao_inf,
+            "volume_relativo": self._volume_relativo,
             "candles_vistos": self._candles_vistos,
         }
 
@@ -338,5 +376,8 @@ def criar_do_config(cfg, prever_probabilidade=None) -> CanalRompimento:
         tipo_canal=cfg.get("estrategia.tipo_canal", "media"),
         preco_referencia=cfg.get("estrategia.preco_referencia", "fechamento"),
         periodo_atr=cfg.get("estrategia.periodo_atr", 14),
+        filtro_volume_ativo=cfg.get("estrategia.filtro_volume_ativo", False),
+        filtro_volume_janela=cfg.get("estrategia.filtro_volume_janela", 100),
+        filtro_volume_limiar=cfg.get("estrategia.filtro_volume_limiar", 0.88),
         prever_probabilidade=prever_probabilidade,
     )
