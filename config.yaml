@@ -388,3 +388,72 @@ mercados:
       # razao para transferirem. Serao remedidos no ouro antes de valerem.
       filtro_volume_ativo: false
       tipo_stop: "nenhum"
+
+  # ---------------------------------------------------------------------------
+  # EURUSD - o representante do "trade do dolar" (EURUSD, GBPUSD e USDJPY sao a
+  # mesma aposta: correlacao +0.81 e -0.63 entre eles).
+  #
+  # ATENCAO: o scan inicial deu "spread ~0%" para este simbolo. Era artefato - a
+  # corretora nao registra spread na coluna do historico. Medido ao vivo em
+  # 04/09/2026: 9 points = 0.9 pip, sobre ATR M15 de 7.1 pips. Um giro consome
+  # 25% de um candle - a mesma faixa do HK50. Por isso o backtest NAO pode usar
+  # o spread do candle aqui: 'spread_forcado' cobre o buraco.
+  # ---------------------------------------------------------------------------
+  EURUSD:
+    mt5:
+      simbolo: "EURUSD"
+    coleta:
+      pasta_saida: "data/historico/EURUSD"
+      timeframes: ["H1", "M15"]
+      data_inicial: "2006-01-01"
+    pregao:
+      tipo: "continuo"
+      fuso_do_ativo: "UTC"
+      dias_negociados: [0, 1, 2, 3, 4, 6]
+    tratamento:
+      densidade_minima_do_dia: 0.05
+      data_inicial_utilizavel: "2006-01-01"
+    custos:
+      spread_indice: 0.00009        # 0.9 pip, medido ao vivo
+      spread_forcado: 0.00009       # o historico nao traz spread confiavel
+      valor_ponto_por_lote: 100000.0
+      comissao_por_lote: 0.1
+      slippage_indice: 0.00001
+      swap_compra_indice: -0.0000836
+      swap_venda_indice: 0.00002024
+    estrategia:
+      filtro_volume_ativo: false
+      tipo_stop: "nenhum"
+
+  # ---------------------------------------------------------------------------
+  # GER40 - o representante do "trade de acoes globais" (GER40, US100 e US30
+  # tem correlacao de +0.61 a +0.69 entre si).
+  #
+  # O mais barato dos tres candidatos: giro consome 9.2% de um candle M15 e
+  # 4.5% de um H1. Em compensacao tem o historico mais curto e o swap mais
+  # pesado: -4.66 pontos por noite comprado, 11.6% de um candle H1.
+  # ---------------------------------------------------------------------------
+  GER40:
+    mt5:
+      simbolo: "GER40"
+    coleta:
+      pasta_saida: "data/historico/GER40"
+      timeframes: ["H1", "M15"]
+      data_inicial: "2012-01-01"
+    pregao:
+      tipo: "continuo"
+      fuso_do_ativo: "UTC"
+      dias_negociados: [0, 1, 2, 3, 4, 6]
+    tratamento:
+      densidade_minima_do_dia: 0.05
+      data_inicial_utilizavel: "2023-01-01"
+    custos:
+      spread_indice: 0.10
+      valor_ponto_por_lote: 1.16
+      comissao_por_lote: 0.1
+      slippage_indice: 0.01
+      swap_compra_indice: -4.656
+      swap_venda_indice: -0.58
+    estrategia:
+      filtro_volume_ativo: false
+      tipo_stop: "nenhum"

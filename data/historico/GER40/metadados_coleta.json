@@ -1,0 +1,134 @@
+{
+  "gerado_em_utc": "2026-09-04T03:30:03.949286+00:00",
+  "simbolo": "GER40",
+  "terminal": {
+    "terminal_build": 6140,
+    "terminal_conectado": true,
+    "trade_permitido": false,
+    "servidor": "Corretora-Demo",
+    "moeda_conta": "USD",
+    "tipo_conta": "DEMO"
+  },
+  "especificacao_contrato": {
+    "nome": "GER40",
+    "descricao": "Germany 40 Index",
+    "digitos": 2,
+    "ponto": 0.01,
+    "spread_atual_pontos": 10,
+    "spread_flutuante": true,
+    "tamanho_contrato": 1.0,
+    "valor_ponto": 0.1,
+    "volume_minimo": 0.01,
+    "volume_maximo": 50.0,
+    "passo_volume": 0.01,
+    "moeda_lucro": "EUR",
+    "swap_compra": -465.6005645,
+    "swap_venda": -57.998748
+  },
+  "fuso_servidor": "Europe/Athens",
+  "fuso_do_ativo": "UTC",
+  "sessoes_regulares": [
+    {
+      "inicio": "09:15",
+      "fim": "12:00"
+    },
+    {
+      "inicio": "13:00",
+      "fim": "16:30"
+    }
+  ],
+  "timeframes": {
+    "H1": {
+      "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\GER40\\GER40_H1_bruto.parquet",
+      "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\GER40\\GER40_H1_pregao.parquet",
+      "inicio": "2023-01-02 07:00:00+00:00",
+      "fim": "2026-09-04 03:00:00+00:00",
+      "anos": 3.67,
+      "qualidade": {
+        "candles_brutos": 31493,
+        "candles_pregao": 20620,
+        "removidos_ohlc_invalido": 0,
+        "removidos_volume_zero": 0,
+        "removidos_fora_pregao": 0,
+        "removidos_dia_nao_negociado": 0,
+        "duplicados": 0,
+        "dias_descartados_por_densidade": 0,
+        "candles_descartados_por_densidade": 0,
+        "candles_antes_do_corte_inicial": 10873,
+        "primeiro_dia_utilizavel": "2023-01-02",
+        "buracos_intra_sessao": 0,
+        "maior_buraco_candles": 2,
+        "detalhe_maiores_buracos": [
+          {
+            "quando": "2023-05-29 22:00:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2023-11-23 23:00:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2024-02-19 23:00:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2024-06-18 23:00:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2024-06-19 22:00:00+00:00",
+            "candles_faltando": 2
+          }
+        ],
+        "dias_negociados": 1058,
+        "candles_por_dia_mediana": 22.0
+      }
+    },
+    "M15": {
+      "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\GER40\\GER40_M15_bruto.parquet",
+      "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\GER40\\GER40_M15_pregao.parquet",
+      "inicio": "2023-01-02 07:00:00+00:00",
+      "fim": "2026-09-04 03:30:00+00:00",
+      "anos": 3.67,
+      "qualidade": {
+        "candles_brutos": 101136,
+        "candles_pregao": 80789,
+        "removidos_ohlc_invalido": 0,
+        "removidos_volume_zero": 0,
+        "removidos_fora_pregao": 0,
+        "removidos_dia_nao_negociado": 0,
+        "duplicados": 0,
+        "dias_descartados_por_densidade": 0,
+        "candles_descartados_por_densidade": 0,
+        "candles_antes_do_corte_inicial": 20347,
+        "primeiro_dia_utilizavel": "2023-01-02",
+        "buracos_intra_sessao": 0,
+        "maior_buraco_candles": 3,
+        "detalhe_maiores_buracos": [
+          {
+            "quando": "2025-06-10 20:45:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2023-07-04 20:45:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2023-09-04 20:45:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2024-01-15 21:45:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2023-01-11 21:30:00+00:00",
+            "candles_faltando": 1
+          }
+        ],
+        "dias_negociados": 1058,
+        "candles_por_dia_mediana": 86.0
+      }
+    }
+  }
+}

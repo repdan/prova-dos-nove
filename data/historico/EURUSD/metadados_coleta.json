@@ -1,0 +1,134 @@
+{
+  "gerado_em_utc": "2026-09-04T03:29:06.098140+00:00",
+  "simbolo": "EURUSD",
+  "terminal": {
+    "terminal_build": 6140,
+    "terminal_conectado": true,
+    "trade_permitido": false,
+    "servidor": "Corretora-Demo",
+    "moeda_conta": "USD",
+    "tipo_conta": "DEMO"
+  },
+  "especificacao_contrato": {
+    "nome": "EURUSD",
+    "descricao": "Euro vs US Dollar",
+    "digitos": 5,
+    "ponto": 1e-05,
+    "spread_atual_pontos": 9,
+    "spread_flutuante": true,
+    "tamanho_contrato": 100000.0,
+    "valor_ponto": 1.0,
+    "volume_minimo": 0.01,
+    "volume_maximo": 50.0,
+    "passo_volume": 0.01,
+    "moeda_lucro": "USD",
+    "swap_compra": -8.3592,
+    "swap_venda": 2.024
+  },
+  "fuso_servidor": "Europe/Athens",
+  "fuso_do_ativo": "UTC",
+  "sessoes_regulares": [
+    {
+      "inicio": "09:15",
+      "fim": "12:00"
+    },
+    {
+      "inicio": "13:00",
+      "fim": "16:30"
+    }
+  ],
+  "timeframes": {
+    "H1": {
+      "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\EURUSD\\EURUSD_H1_bruto.parquet",
+      "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\EURUSD\\EURUSD_H1_pregao.parquet",
+      "inicio": "2006-01-02 00:00:00+00:00",
+      "fim": "2026-09-04 03:00:00+00:00",
+      "anos": 20.67,
+      "qualidade": {
+        "candles_brutos": 107199,
+        "candles_pregao": 105779,
+        "removidos_ohlc_invalido": 0,
+        "removidos_volume_zero": 0,
+        "removidos_fora_pregao": 0,
+        "removidos_dia_nao_negociado": 395,
+        "duplicados": 0,
+        "dias_descartados_por_densidade": 1025,
+        "candles_descartados_por_densidade": 1025,
+        "candles_antes_do_corte_inicial": 0,
+        "primeiro_dia_utilizavel": "2006-01-02",
+        "buracos_intra_sessao": 0,
+        "maior_buraco_candles": 3,
+        "detalhe_maiores_buracos": [
+          {
+            "quando": "2006-11-16 06:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2014-12-24 22:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2014-12-31 22:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2014-05-01 04:00:00+00:00",
+            "candles_faltando": 2
+          },
+          {
+            "quando": "2016-03-23 19:00:00+00:00",
+            "candles_faltando": 2
+          }
+        ],
+        "dias_negociados": 5245,
+        "candles_por_dia_mediana": 24.0
+      }
+    },
+    "M15": {
+      "arquivo_bruto": "C:\\dev\\hk50-bot\\data\\historico\\EURUSD\\EURUSD_M15_bruto.parquet",
+      "arquivo_pregao": "C:\\dev\\hk50-bot\\data\\historico\\EURUSD\\EURUSD_M15_pregao.parquet",
+      "inicio": "2006-01-02 00:00:00+00:00",
+      "fim": "2026-09-04 03:15:00+00:00",
+      "anos": 20.67,
+      "qualidade": {
+        "candles_brutos": 416068,
+        "candles_pregao": 414431,
+        "removidos_ohlc_invalido": 0,
+        "removidos_volume_zero": 0,
+        "removidos_fora_pregao": 0,
+        "removidos_dia_nao_negociado": 395,
+        "duplicados": 0,
+        "dias_descartados_por_densidade": 1045,
+        "candles_descartados_por_densidade": 1242,
+        "candles_antes_do_corte_inicial": 0,
+        "primeiro_dia_utilizavel": "2006-01-02",
+        "buracos_intra_sessao": 0,
+        "maior_buraco_candles": 3,
+        "detalhe_maiores_buracos": [
+          {
+            "quando": "2008-11-09 23:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2008-11-16 23:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2008-11-23 23:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2008-11-30 23:00:00+00:00",
+            "candles_faltando": 3
+          },
+          {
+            "quando": "2008-12-07 23:00:00+00:00",
+            "candles_faltando": 3
+          }
+        ],
+        "dias_negociados": 5225,
+        "candles_por_dia_mediana": 96.0
+      }
+    }
+  }
+}
