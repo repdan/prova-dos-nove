@@ -52,7 +52,7 @@ def main() -> int:
     cfg = Config.carregar()
     capital = cfg.get("backtest.capital_inicial", 10_000.0)
 
-    titulo("ETAPA 3 - BACKTEST EVENT-DRIVEN")
+    titulo(f"BACKTEST - {cfg.mercado}")
     _, feed_desc = montar_do_config(cfg, modo_saida="stop_gain")
     print(f"  Dados ............ {feed_desc.descricao}")
     print(f"  Custos ........... spread {cfg.get('custos.spread_indice')} pts + "
@@ -165,7 +165,8 @@ def regime(quadro: pd.DataFrame, cfg: Config) -> None:
         print("  (sem trades)")
         return
     pasta = cfg.caminho_absoluto("coleta.pasta_saida")
-    pregao = pd.read_parquet(pasta / "HK50_M15_pregao.parquet")
+    simbolo = cfg.exigir("mt5.simbolo")
+    pregao = pd.read_parquet(pasta / f"{simbolo}_M15_pregao.parquet")
     dir_dia = direcionalidade_por_dia(pregao)
 
     t = quadro.copy()

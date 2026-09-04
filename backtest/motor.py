@@ -274,17 +274,18 @@ def montar_do_config(cfg, caminho_pregao=None, caminho_menor=None,
     from strategy.canal_rompimento import CanalRompimento
 
     pasta = cfg.caminho_absoluto("coleta.pasta_saida")
-    caminho_pregao = caminho_pregao or (pasta / "HK50_M15_pregao.parquet")
+    simbolo = cfg.exigir("mt5.simbolo")
+    caminho_pregao = caminho_pregao or (pasta / f"{simbolo}_M15_pregao.parquet")
     feed = FeedParquet(caminho_pregao, inicio=inicio, fim=fim)
 
     resolvedor = None
     if caminho_menor is None:
-        candidato = pasta / "HK50_M5_pregao.parquet"
+        candidato = pasta / f"{simbolo}_M5_pregao.parquet"
         caminho_menor = candidato if candidato.exists() else None
     if caminho_menor is not None:
         resolvedor = ResolvedorIntrabar(caminho_menor, minutos_menor=5)
 
-    bruto = pasta / "HK50_M15_bruto.parquet"
+    bruto = pasta / f"{simbolo}_M15_bruto.parquet"
     contexto = ContextoDiario(
         feed.quadro,
         pd.read_parquet(bruto) if bruto.exists() else None,

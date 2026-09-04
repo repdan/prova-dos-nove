@@ -43,7 +43,24 @@ class RelatorioQualidade:
 
 
 def marcar_pregao(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
-    """Adiciona a coluna booleana 'em_pregao' sem remover nada ainda."""
+    """Adiciona 'em_pregao' e 'sessao_id' sem remover nada ainda.
+
+    Dois tipos de mercado, dois jeitos de definir um bloco continuo de
+    negociacao:
+
+      sessoes  - indices, que abrem e fecham em horarios fixos. O bloco vem do
+                 config: manha, tarde, after-hours.
+      continuo - forex e metais, que rodam de domingo a noite a sexta a noite
+                 com uma pausa diaria curta. Nao ha horario a declarar; o bloco
+                 e descoberto no proprio dado, olhando os intervalos entre
+                 candles.
+
+    A distincao existe porque 'sessao_id' e o que separa buraco de dado de
+    mercado fechado, e essa separacao precisa funcionar nos dois casos.
+    """
+    if cfg.get("pregao.tipo", "sessoes") == "continuo":
+        return _marcar_continuo(df, cfg)
+
     sessoes = cfg.exigir("pregao.sessoes_regulares")
     dias_ok = set(cfg.exigir("pregao.dias_negociados"))
 
@@ -64,6 +81,31 @@ def marcar_pregao(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     df["sessao_id"] = sessao_id
     df["em_pregao"] = (sessao_id >= 0) & dia_ok
     df["dia_negociado"] = dia_ok
+    return df
+
+
+def _marcar_continuo(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
+    """Blocos descobertos pelos intervalos entre candles.
+
+    Um intervalo grande e mercado fechado - fim de semana, pausa diaria de
+    manutencao, feriado. Um intervalo pequeno e candle faltando. O limiar que
+    separa os dois vem do config, em multiplos do proprio timeframe, e por isso
+    funciona igual em M5, M15 ou H1.
+    """
+    limite = int(cfg.get("pregao.candles_ate_ser_pausa", 4))
+    minutos = MINUTOS_POR_TIMEFRAME[cfg.get("_timeframe_atual", "M15")]
+
+    df = df.copy()
+    intervalo = df["tempo_ativo"].diff().dt.total_seconds().div(60)
+    # Primeiro candle da base comeca um bloco; NaN vira "abriu bloco novo".
+    novo_bloco = (intervalo / minutos > limite) | intervalo.isna()
+    df["sessao_id"] = novo_bloco.cumsum()
+
+    dias_ok = set(cfg.get("pregao.dias_negociados") or range(7))
+    df["dia_negociado"] = df["tempo_ativo"].dt.dayofweek.isin(dias_ok)
+    # Em mercado continuo tudo que existe e pregao: se o candle esta ali, houve
+    # negociacao. Descartar por horario seria inventar uma sessao que nao ha.
+    df["em_pregao"] = df["dia_negociado"]
     return df
 
 
@@ -199,6 +241,9 @@ def processar(df_bruto: pd.DataFrame, timeframe: str,
               cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame, RelatorioQualidade]:
     """Pipeline completo. Retorna (bruto_marcado, so_pregao, relatorio)."""
     rel = RelatorioQualidade(candles_brutos=len(df_bruto))
+    # O detector de blocos do mercado continuo precisa saber o passo do
+    # timeframe para converter o limiar de candles em minutos.
+    cfg.definir("_timeframe_atual", timeframe)
 
     df = marcar_pregao(df_bruto, cfg)
     df = limpar(df, cfg, rel)

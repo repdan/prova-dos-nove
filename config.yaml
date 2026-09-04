@@ -1,4 +1,13 @@
 # =============================================================================
+# QUAL MERCADO ESTA SENDO ESTUDADO
+#
+# O que vem abaixo e a base comum. A secao 'mercados' no fim do arquivo traz
+# o que muda de um instrumento para outro, e e mesclada por cima desta base.
+# Assim cada mercado declara so as suas diferencas.
+# =============================================================================
+mercado_ativo: "XAUUSD"
+
+# =============================================================================
 # CONFIGURACAO UNICA DO PROJETO
 # Nenhum parametro de estrategia, dado ou custo deve estar hardcoded no codigo.
 # Se voce quer mudar o comportamento do sistema, e aqui que voce mexe.
@@ -42,6 +51,15 @@ coleta:
 # Horarios no fuso de Hong Kong (Asia/Hong_Kong), que e o fuso do ativo.
 # -----------------------------------------------------------------------------
 pregao:
+  # sessoes  - abre e fecha em horarios fixos (indices)
+  # continuo - roda de domingo a noite a sexta a noite (forex, metais)
+  tipo: "sessoes"
+
+  # Mercado continuo: intervalo entre candles, em multiplos do timeframe, a
+  # partir do qual se considera que o mercado estava FECHADO em vez de faltar
+  # candle. Abaixo disso e buraco de dado e entra no relatorio de qualidade.
+  candles_ate_ser_pausa: 4
+
   fuso_do_ativo: "Asia/Hong_Kong"
 
   # DECISAO DO PROJETO: operar apenas o pregao regular (onde esta a liquidez).
@@ -280,3 +298,89 @@ estrategia:
   # ganho era ficcao de execucao.
   stop_catastrofico_ativo: false
   stop_catastrofico_atr: 3.0
+
+# =============================================================================
+# MERCADOS
+# Cada perfil e mesclado por cima da base. Escolha em 'mercado_ativo' no topo.
+# =============================================================================
+mercados:
+
+  # ---------------------------------------------------------------------------
+  # HK50 - congelado. Um giro custa 22% de um candle M15, o 151o pior entre os
+  # 304 simbolos liquidos da corretora. Mantido para comparacao e para o dia em
+  # que quisermos uma estrategia adequada a ele.
+  # ---------------------------------------------------------------------------
+  HK50:
+    mt5:
+      simbolo: "HK50"
+    coleta:
+      pasta_saida: "data/historico/HK50"
+      timeframes: ["M15", "M5"]
+    pregao:
+      tipo: "sessoes"
+      fuso_do_ativo: "Asia/Hong_Kong"
+      sessoes_regulares:
+        - {inicio: "09:15", fim: "12:00"}
+        - {inicio: "13:00", fim: "16:30"}
+      dias_negociados: [0, 1, 2, 3, 4]
+    tratamento:
+      densidade_minima_do_dia: 0.35
+      data_inicial_utilizavel: "2022-01-01"
+    custos:
+      spread_indice: 4.5
+      valor_ponto_por_lote: 0.1275
+      comissao_por_lote: 0.1
+      slippage_indice: 0.5
+      swap_compra_indice: -5.50
+      swap_venda_indice: 0.03
+
+  # ---------------------------------------------------------------------------
+  # XAUUSD - o novo alvo. Um giro custa 2.1% de um candle M15 (4o entre os 304),
+  # tem 28,4 anos de historico e correlacao de 0.25-0.37 com tudo o mais, o que
+  # o torna a aposta independente do conjunto.
+  #
+  # Contrato: 100 oz por lote, digitos 2, ponto 0.01.
+  # 1 dolar de movimento = 100 USD por lote, entao 1 "ponto" = 1 USD por lote.
+  # ---------------------------------------------------------------------------
+  XAUUSD:
+    mt5:
+      simbolo: "XAUUSD"
+    coleta:
+      pasta_saida: "data/historico/XAUUSD"
+      timeframes: ["M15", "M5"]
+      data_inicial: "1998-01-01"
+    pregao:
+      tipo: "continuo"
+      fuso_do_ativo: "UTC"
+      # Domingo (6) entra: o mercado abre na noite de domingo.
+      dias_negociados: [0, 1, 2, 3, 4, 6]
+      candles_ate_ser_pausa: 4
+    tratamento:
+      # Mercado continuo tem dias legitimamente curtos - domingo abre so as
+      # 22h UTC (8 candles M15) e sexta fecha cedo. Limiar baixo para nao
+      # descartar esses; o custo real de operar num domingo ralo aparece
+      # sozinho no spread que o backtest cobra.
+      densidade_minima_do_dia: 0.05
+
+      # Medido em 04/09/2026: de 1998 a 2015 o terminal entrega 2 candles por
+      # dia (2% de um pregao) e 2016 entrega 22%. Sao barras residuais, o mesmo
+      # padrao do HK50 antes de 2022. O dado so fica integro em 2017: 96% em
+      # 2017 e 100% de 2018 em diante.
+      #
+      # Resultado: 10 anos utilizaveis, nao os 28 que o terminal alega. Ainda
+      # assim sao 225.551 candles M15 contra 27.099 do HK50.
+      data_inicial_utilizavel: "2017-01-01"
+    custos:
+      # Medido em 04/09/2026: spread 22 points = 0.22 USD, ATR M15 de 7.56 USD.
+      # Um giro completo consome 5.8% de um candle tipico.
+      spread_indice: 0.22          # em USD (a "unidade de preco" do ouro)
+      valor_ponto_por_lote: 100.0  # 1 USD de movimento = 100 USD por lote
+      comissao_por_lote: 0.1
+      slippage_indice: 0.02        # ~9% de um spread, mesma proporcao do HK50
+      swap_compra_indice: -0.68    # -67.97 points x 0.01
+      swap_venda_indice: 0.36      # +35.87 points x 0.01 (vendido RECEBE)
+    estrategia:
+      # Zerados de proposito: sao os parametros calibrados no HK50 e nao ha
+      # razao para transferirem. Serao remedidos no ouro antes de valerem.
+      filtro_volume_ativo: false
+      tipo_stop: "nenhum"

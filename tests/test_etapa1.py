@@ -62,7 +62,13 @@ def gerar_candles(dias: int = 40, minutos: int = 15,
 
 @pytest.fixture
 def cfg() -> Config:
-    return Config.carregar()
+    """Perfil do HK50, explicitamente.
+
+    Estes testes cobrem o tratamento de mercado com SESSOES fixas. Carregar o
+    config sem dizer qual mercado pegaria o ativo do momento - hoje o ouro, que
+    e continuo - e os testes passariam a medir outra coisa sem ninguem notar.
+    """
+    return Config.carregar(mercado="HK50")
 
 
 def test_infere_o_fuso_do_servidor_corretamente(cfg):
