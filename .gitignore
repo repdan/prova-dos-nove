@@ -10,3 +10,9 @@ ml/modelos/*.pkl
 
 # M1: grande demais para versionar; os coletores em analises/ recriam
 data/historico/**/*_M1_*.parquet
+
+# Saidas do robo da demo (estado local)
+execucao/diario.csv
+execucao/robo.log
+execucao/estado.json
+execucao/PARAR

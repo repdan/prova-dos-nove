@@ -63,8 +63,13 @@ def nuvem(df: pd.DataFrame, p: ParametrosIchimoku) -> tuple[np.ndarray, np.ndarr
 
 
 def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
-                     ponto: float = 0.01) -> pd.DataFrame:
-    """df: velas em ordem com coluna 'dia' (posicao fecha na ultima vela do dia)."""
+                     ponto: float = 0.01, ao_vivo: dict | None = None) -> pd.DataFrame:
+    """df: velas em ordem com coluna 'dia' (posicao fecha na ultima vela do dia).
+
+    ao_vivo: dict com "fim_previsto" (fim do dia corrente). A ultima vela e
+    "agora": o dia corrente nao fecha, e a posicao que deve estar aberta volta
+    em ao_vivo["pos"].
+    """
     df = df.reset_index(drop=True)
     sup, inf = nuvem(df, p)
     a, mx, mn, f = (df[c].to_numpy(float) for c in ("abertura", "maxima", "minima", "fechamento"))
@@ -75,6 +80,11 @@ def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
     ultimo_do_dia = np.r_[dia[1:] != dia[:-1], True]
     fim = df.groupby("dia")["tempo_ativo"].transform("max")
     min_ate_fim = (pd.DatetimeIndex(fim) - t).total_seconds().to_numpy() / 60
+    if ao_vivo is not None:
+        # Se a vela atual ja e a ultima do dia, o dia acabou: fecha como no backtest.
+        ultimo_do_dia[-1] = t[-1] >= pd.Timestamp(ao_vivo["fim_previsto"])
+        hoje = dia == dia[-1]
+        min_ate_fim[hoje] = (pd.Timestamp(ao_vivo["fim_previsto"]) - t[hoje]).total_seconds() / 60
     amp = pd.Series(mx - mn).rolling(14).mean().to_numpy()
 
     trades, pos = [], None
@@ -150,4 +160,6 @@ def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
         pos = {"dir": d, "sinal": sinal, "tipo": "forte" if forte else "fraca", "t": t[i],
                "entrada": entrada, "stop": stop, "take": take, "risco": risco, "w": w,
                "be": False, "c0": ponta(i)}
+    if ao_vivo is not None:
+        ao_vivo["pos"] = pos
     return pd.DataFrame(trades)

@@ -251,7 +251,8 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
                 amp_ref: float, p: ParametrosGrade, custos: Custos,
                 ponto: float = 0.01, rastro: list | None = None,
                 vies_inicial: int | None = None, pos_herdada: dict | None = None,
-                sem_entradas: bool = False, saida: dict | None = None) -> list[TradeGrade]:
+                sem_entradas: bool = False, saida: dict | None = None,
+                em_andamento: bool = False, fim_previsto=None) -> list[TradeGrade]:
     """Roda um pregao. `dia` precisa estar em ordem e conter so este dia.
 
     amp_ref: amplitude mediana das velas do dia ANTERIOR - escala do "canal
@@ -263,6 +264,11 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
     pos_herdada / saida: posicao que veio aberta do dia anterior, e o dict que
     recebe ("pos") a que fica aberta no fim deste dia (p.carregar_posicao).
     sem_entradas: so administra a posicao herdada, sem abrir nada novo.
+
+    em_andamento / fim_previsto: uso AO VIVO. A ultima vela e "agora", nao o
+    fim do dia: nada fecha por fim de dia, entradas na ultima vela sao
+    permitidas, o corte de horario usa fim_previsto, e a posicao que deve
+    estar aberta agora vai para saida["pos"].
     """
     canal = canal_de_abertura(dia, amp_ref, p)
     if canal is None and pos_herdada is None:
@@ -289,6 +295,13 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
     fim_sessao = dia.groupby("sessao_id")["tempo_ativo"].transform("max")
     minutos_ate_fim = ((pd.DatetimeIndex(fim_sessao) - tempos_ts)
                        .total_seconds().to_numpy() / 60)
+    if fim_previsto is not None:
+        minutos_ate_fim = (pd.Timestamp(fim_previsto) - tempos_ts).total_seconds().to_numpy() / 60
+        # Se a vela atual ja e a ultima do dia, o dia acabou: fecha como no backtest.
+        if em_andamento and tempos_ts[-1] >= pd.Timestamp(fim_previsto):
+            em_andamento = False
+            if saida is not None:
+                saida["pos"] = None
 
     est = _Estado()
     if p.tendencia == "gap" and fechamento_anterior is not None:
@@ -390,7 +403,7 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
                 novo = pos["entrada"] + d * max(k - 1, 0) * wp
                 if (novo - pos["stop"]) * d > 0:
                     pos["stop"] = novo
-            if pos is not None and i == n - 1:
+            if pos is not None and i == n - 1 and not em_andamento:
                 if carregar and saida is not None:
                     saida["pos"] = pos
                 else:
@@ -401,6 +414,8 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
         for i in range(0, ultima_do_canal + 1):
             gerir(i)
     if canal is None:
+        if em_andamento and saida is not None:
+            saida["pos"] = pos
         return trades
 
     for i in range(ultima_do_canal + 1, n):
@@ -415,7 +430,8 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
         sinal, tipo, _ = passo_da_grade(est, f[i], base, w, p)
 
         # ---------------- 3. abrir ------------------------------------------
-        if (sinal == 0 or pos is not None or est.encerrado or i == n - 1 or sem_entradas
+        if (sinal == 0 or pos is not None or est.encerrado or sem_entradas
+                or (i == n - 1 and not em_andamento)
                 or minutos_ate_fim[i] < p.sem_entrada_antes_do_fim_min):
             bloqueio = ("" if sinal == 0 else "posicionado" if pos is not None
                         else "dia encerrado" if est.encerrado
@@ -454,6 +470,8 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
         eventos.append({"tipo": "entrada"})
         registrar(i, sinal, tipo)
 
+    if em_andamento and saida is not None:
+        saida["pos"] = pos
     return trades
 
 
@@ -516,16 +534,23 @@ def passo_da_grade(est: _Estado, fi: float, base: float, w: float,
 # ------------------------------------------------------------------- historico
 
 def simular(df: pd.DataFrame, p: ParametrosGrade, custos: Custos,
-            ponto: float = 0.01, periodo: str = "dia") -> pd.DataFrame:
+            ponto: float = 0.01, periodo: str = "dia", ao_vivo: dict | None = None) -> pd.DataFrame:
     """Roda todos os dias de um historico intradiario e devolve os trades.
 
     periodo="semana": o "dia" do metodo vira a semana - canal nas primeiras
     velas da semana, grade valida ate sexta, limites de gain/stop semanais.
+
+    ao_vivo: dict com "fim_previsto" (fim do dia corrente, no relogio de
+    tempo_ativo). O ULTIMO dia e tratado como em andamento, e a posicao que
+    deve estar aberta agora volta em ao_vivo["pos"] (None = fora).
     """
     df = df.sort_values("tempo_ativo").reset_index(drop=True)
     dias = df["tempo_ativo"].dt.date
     if periodo == "semana":
         dias = df["tempo_ativo"].dt.to_period("W").dt.start_time.dt.date
+    ultimo_dia = dias.iloc[-1] if len(dias) else None
+    if ao_vivo is not None:
+        ao_vivo["pos"] = None
     linhas = []
     anterior = None
     semana, ganhou, stops = None, False, 0
@@ -548,10 +573,14 @@ def simular(df: pd.DataFrame, p: ParametrosGrade, custos: Custos,
             if p.tendencia == "dia_anterior":
                 vies = int(np.sign(fech_ant - float(anterior["abertura"].iloc[0])))
             saida: dict = {}
+            vivo = ao_vivo is not None and dia == ultimo_dia
             trades_dia = simular_dia(bloco.reset_index(drop=True), fech_ant, amp_ref, pd_,
                                      custos, ponto, vies_inicial=vies, pos_herdada=herdada,
-                                     sem_entradas=pula, saida=saida)
+                                     sem_entradas=pula, saida=saida, em_andamento=vivo,
+                                     fim_previsto=ao_vivo.get("fim_previsto") if vivo else None)
             herdada = saida.get("pos")
+            if vivo:
+                ao_vivo["pos"] = herdada
             for t in trades_dia:
                 linhas.append({**t.__dict__, "r": t.r})
                 ganhou = ganhou or t.motivo == "take"
