@@ -26,16 +26,20 @@ PAUSA_H = 3.0
 DESTINO = Path(__file__).resolve().parent.parent / "data" / "historico" / "OOS"
 
 
-def montar_dias(bruto: pd.DataFrame) -> pd.DataFrame:
+def montar_dias(bruto: pd.DataFrame, pausa_h: float = PAUSA_H,
+                quantil_tipico: float = 0.5) -> pd.DataFrame:
+    """quantil_tipico: o tamanho de dia "normal". Mediana serve quando o
+    historico e denso; com anos esparsos (ouro 2017-18, milhares de blocos de
+    1 vela) a mediana desaba e e preciso um quantil alto."""
     d = bruto.sort_values("tempo_servidor").reset_index(drop=True)
     pausa = d["tempo_servidor"].diff().dt.total_seconds() / 3600
-    d["sessao_id"] = (pausa.fillna(99) > PAUSA_H).cumsum()
+    d["sessao_id"] = (pausa.fillna(99) > pausa_h).cumsum()
     # O "dia" e a data em que o bloco comeca.
     inicio = d.groupby("sessao_id")["tempo_servidor"].transform("min")
     d["dia_bloco"] = inicio.dt.date
     tam = d.groupby("sessao_id")["fechamento"].transform("size")
     # Blocos curtos (feriado, dado esparso) saem: menos de 60% do tamanho tipico.
-    tipico = d.groupby("sessao_id").size().median()
+    tipico = d.groupby("sessao_id").size().quantile(quantil_tipico)
     d = d[tam >= 0.6 * tipico].copy()
     # tempo_ativo: relogio continuo onde cada bloco cai num unico dia de calendario
     # (os simuladores agrupam por data). Desloca o bloco para comecar 00:00 do dia.

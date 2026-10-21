@@ -1,0 +1,6 @@
+{
+ "ponto": 0.01,
+ "spread_atual": 0.8,
+ "spread_mediano_hist": 1.2,
+ "usd_por_ponto_lote": 1.0
+}

@@ -30,7 +30,7 @@ testada em plato e nao escolhida a dedo.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import pandas as pd
@@ -63,10 +63,15 @@ class ParametrosGrade:
     canal_fora_da_faixa: str = "mais_proximo"
     # Prefere canais que tenham o primeiro preco do dia como uma das bordas.
     canal_primeiro_preco: bool = False
+    # Alvo do canal em % do preco de abertura (faixa = alvo +-20%). Para
+    # ativos cujo preco mudou de patamar (ouro: 1.270 em 2017, 4.560 em 2026),
+    # um alvo fixo em pontos mediria coisas diferentes em cada ano.
+    canal_alvo_pct: float | None = None
 
     # --- tendencia do dia ---------------------------------------------------
     # "gap": direcao do gap de abertura define a tendencia inicial.
     # "neutra": comeca sem vies; a primeira saida da caixa define.
+    # "dia_anterior": direcao do dia anterior (fechamento contra abertura).
     tendencia: str = "gap"
 
     # --- entradas -----------------------------------------------------------
@@ -98,6 +103,12 @@ class ParametrosGrade:
     # Quantos sinais validos do dia sao deixados passar antes da primeira
     # entrada ("evitar a primeira ordem do dia"). A grade segue normalmente.
     pular_sinais: int = 0
+    # Gestao semanal: o canal continua diario, mas os limites valem para a
+    # semana - 1 gain encerra a semana; stops_semana stops tambem. dias_semana:
+    # weekday() dos dias operados (0 = segunda); None = todos.
+    gestao_semanal: bool = False
+    stops_semana: int = 2
+    dias_semana: tuple[int, ...] | None = None
 
     # --- controle -----------------------------------------------------------
     # Mesmas entradas, sentido oposto, mesmo risco e mesmo take. Nao e uma
@@ -135,6 +146,12 @@ class Custos:
     slippage: float = 0.5           # pontos de indice por ponta
     comissao_pontos: float = 0.78   # pontos por giro (0.1 USD / 0.1275 USD/pt)
     spread_forcado: float | None = None
+    # Swap por noite em unidades de preco (negativo = paga). So importa quando
+    # a posicao atravessa dias (operacao semanal). dia_triplo: weekday() do
+    # Python (0 = segunda) em que a corretora cobra 3 noites.
+    swap_compra: float = 0.0
+    swap_venda: float = 0.0
+    dia_triplo: int = 2
 
 
 # --------------------------------------------------------------- canal de abertura
@@ -183,6 +200,10 @@ def _canal_por_alvo(a, mx, mn, f, p: ParametrosGrade) -> tuple[float, float, int
     topos.add(primeiro)
     fundos.add(primeiro)
     lo, hi = p.canal_faixa
+    alvo = p.canal_alvo
+    if p.canal_alvo_pct is not None:
+        alvo = p.canal_alvo_pct / 100 * primeiro
+        lo, hi = 0.8 * alvo, 1.2 * alvo
     pares = [(float(t), float(b)) for t in topos for b in fundos if t > b]
     if not pares:
         return None
@@ -193,7 +214,7 @@ def _canal_por_alvo(a, mx, mn, f, p: ParametrosGrade) -> tuple[float, float, int
         fora = 0 if lo <= w <= hi else 1
         sem_primeiro = 0 if (not p.canal_primeiro_preco
                              or primeiro in (t, b)) else 1
-        return (fora, sem_primeiro, abs(w - p.canal_alvo))
+        return (fora, sem_primeiro, abs(w - alvo))
 
     t, b = min(pares, key=nota)
     if not (lo <= t - b <= hi) and p.canal_fora_da_faixa == "nao_opera":
@@ -219,7 +240,8 @@ def _nivel(x: float, base: float, w: float) -> int:
 
 def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
                 amp_ref: float, p: ParametrosGrade, custos: Custos,
-                ponto: float = 0.01, rastro: list | None = None) -> list[TradeGrade]:
+                ponto: float = 0.01, rastro: list | None = None,
+                vies_inicial: int | None = None) -> list[TradeGrade]:
     """Roda um pregao. `dia` precisa estar em ordem e conter so este dia.
 
     amp_ref: amplitude mediana das velas do dia ANTERIOR - escala do "canal
@@ -252,6 +274,8 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
     est = _Estado()
     if p.tendencia == "gap" and fechamento_anterior is not None:
         est.vies = 1 if a[0] > fechamento_anterior else -1 if a[0] < fechamento_anterior else 0
+    if vies_inicial is not None:
+        est.vies = vies_inicial
     # NR inicial: o proprio canal de abertura (nivel 0).
     est.cr = 0
 
@@ -267,6 +291,12 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
         d = pos["dir"]
         bruto = (preco - pos["entrada"]) * d
         custo = pos["custo_entrada"] + custo_ponta(i) + custos.comissao_pontos
+        taxa = custos.swap_compra if d > 0 else custos.swap_venda
+        if taxa:
+            d0, d1 = pos["t"].date(), tempos_ts[i].date()
+            noites = sum(3 if (d0 + pd.Timedelta(days=k)).weekday() == custos.dia_triplo else 1
+                         for k in range((d1 - d0).days))
+            custo -= taxa * noites      # swap negativo vira custo; positivo, credito
         trades.append(TradeGrade(
             dia=tempos_ts[0].date(), direcao=d, tipo=pos["tipo"],
             tempo_entrada=pos["t"], tempo_saida=tempos_ts[i],
@@ -439,18 +469,40 @@ def passo_da_grade(est: _Estado, fi: float, base: float, w: float,
 # ------------------------------------------------------------------- historico
 
 def simular(df: pd.DataFrame, p: ParametrosGrade, custos: Custos,
-            ponto: float = 0.01) -> pd.DataFrame:
-    """Roda todos os dias de um historico intradiario e devolve os trades."""
+            ponto: float = 0.01, periodo: str = "dia") -> pd.DataFrame:
+    """Roda todos os dias de um historico intradiario e devolve os trades.
+
+    periodo="semana": o "dia" do metodo vira a semana - canal nas primeiras
+    velas da semana, grade valida ate sexta, limites de gain/stop semanais.
+    """
     df = df.sort_values("tempo_ativo").reset_index(drop=True)
     dias = df["tempo_ativo"].dt.date
+    if periodo == "semana":
+        dias = df["tempo_ativo"].dt.to_period("W").dt.start_time.dt.date
     linhas = []
     anterior = None
+    semana, ganhou, stops = None, False, 0
     for dia, bloco in df.groupby(dias, sort=True):
-        if anterior is not None:
+        pula = False
+        if p.gestao_semanal:
+            sem = pd.Timestamp(dia).to_period("W")
+            if sem != semana:
+                semana, ganhou, stops = sem, False, 0
+            pula = (ganhou or stops >= p.stops_semana
+                    or (p.dias_semana is not None and pd.Timestamp(dia).weekday() not in p.dias_semana))
+        if anterior is not None and not pula:
+            pd_ = p
+            if p.gestao_semanal:
+                pd_ = replace(p, max_stops_dia=p.stops_semana - stops, parar_no_take=True)
             amp_ref = float((anterior["maxima"] - anterior["minima"]).median())
             fech_ant = float(anterior["fechamento"].iloc[-1])
+            vies = None
+            if p.tendencia == "dia_anterior":
+                vies = int(np.sign(fech_ant - float(anterior["abertura"].iloc[0])))
             for t in simular_dia(bloco.reset_index(drop=True), fech_ant,
-                                 amp_ref, p, custos, ponto):
+                                 amp_ref, pd_, custos, ponto, vies_inicial=vies):
                 linhas.append({**t.__dict__, "r": t.r})
+                ganhou = ganhou or t.motivo == "take"
+                stops += int(t.motivo == "stop" and not t.foi_0x0)
         anterior = bloco
     return pd.DataFrame(linhas)

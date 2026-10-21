@@ -86,6 +86,23 @@ def test_canal_por_alvo_prefere_o_primeiro_preco():
     assert 1000 in (base, base + w) and 40 <= w <= 60
 
 
+def test_canal_por_alvo_em_porcentagem_do_preco():
+    """Abertura 1000, alvo 5% = 50 pontos (faixa 40-60)."""
+    p = replace(BASE, canal_modo="alvo", canal_alvo_pct=5.0)
+    velas = [(1000, 1030, 980, 1020), (1020, 1060, 1015, 1032),
+             (1032, 1040, 1025, 1030), (1030, 1035, 1022, 1028)]
+    _, w, _ = canal_de_abertura(dia(velas), 10.0, p)
+    assert 40 <= w <= 60
+
+
+def test_vies_inicial_substitui_o_gap():
+    """Gap de alta, mas vies de queda pelo dia anterior: fechar acima do NR
+    nao e continuacao (nao ha tendencia de alta); fechar alem da ZR de cima e."""
+    velas = [ABERTURA, (1080, 1130, 1075, 1120), (1120, 1125, 1115, 1121)]
+    t = simular_dia(dia(velas), 900.0, 10.0, BASE, SEM_CUSTO, vies_inicial=-1)
+    assert t == [] or t[0].tipo != "continuacao"
+
+
 # ---------------------------------------------------------------- entradas
 
 def test_continuacao_em_alta_stop_fora_da_zona_e_take_um_nivel():
@@ -202,6 +219,42 @@ def test_evitar_a_primeira_ordem_do_dia():
     t = rodar(velas, p=p)
     assert len(t) == 1 and t[0].preco_entrada == 1210
     assert len(rodar(velas)) == 1 and rodar(velas)[0].preco_entrada == 1120
+
+
+def test_swap_cobrado_por_noite_e_triplo_na_quarta():
+    """Comprado de terca a quinta: noite de terca (1) + quarta (3) = 4 noites."""
+    c = Custos(slippage=0, comissao_pontos=0, spread_forcado=0.0, swap_compra=-1.0, dia_triplo=2)
+    p = replace(BASE, take_niveis=0, usar_0x0=False)
+    t0 = pd.Timestamp("2024-03-05 09:00", tz="Asia/Hong_Kong")    # terca
+    velas = [ABERTURA, (1080, 1130, 1075, 1120), (1120, 1125, 1115, 1121)]
+    d = dia(velas)
+    d["tempo_ativo"] = [t0, t0 + pd.Timedelta(minutes=1), t0 + pd.Timedelta(days=2)]
+    tr = simular_dia(d, 900.0, 10.0, p, c)[0]
+    assert tr.motivo == "fim_do_dia"
+    assert tr.custo == pytest.approx(4.0)
+
+
+def test_gestao_semanal_um_gain_encerra_a_semana():
+    """Dia 1 (seg) bate o take; dia 2 (ter) teria outro take, mas a semana acabou."""
+    from strategy.grade import simular
+    p = replace(BASE, gestao_semanal=True, tendencia="neutra")
+    velas = [ABERTURA, (1080, 1130, 1075, 1120), (1120, 1225, 1115, 1180)]
+    dias_ = [dia(velas, inicio=f"2024-03-0{k} 09:15") for k in (1, 4, 5)]  # sex, seg, ter
+    df = pd.concat(dias_, ignore_index=True)
+    t = simular(df, p, SEM_CUSTO)
+    assert len(t) == 1 and t["motivo"].iloc[0] == "take"
+    assert pd.Timestamp(t["tempo_entrada"].iloc[0]).day == 4
+    sem_limite = simular(df, replace(BASE, tendencia="neutra"), SEM_CUSTO)
+    assert len(sem_limite) == 2
+
+
+def test_gestao_semanal_so_nos_dias_permitidos():
+    from strategy.grade import simular
+    p = replace(BASE, gestao_semanal=True, dias_semana=(1,), tendencia="neutra")       # so terca
+    velas = [ABERTURA, (1080, 1130, 1075, 1120), (1120, 1225, 1115, 1180)]
+    df = pd.concat([dia(velas, inicio=f"2024-03-0{k} 09:15") for k in (1, 4, 5)], ignore_index=True)
+    t = simular(df, p, SEM_CUSTO)
+    assert len(t) == 1 and pd.Timestamp(t["tempo_entrada"].iloc[0]).day == 5
 
 
 def test_custo_e_cobrado_nas_duas_pontas():
