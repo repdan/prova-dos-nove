@@ -43,7 +43,7 @@ from analises.coletar_m1_indices import montar_dias                      # noqa:
 from configuracao import Config                                          # noqa: E402
 from data import coleta                                                  # noqa: E402
 from data.mt5_conexao import conectar, desconectar                       # noqa: E402
-from strategy.grade import simular                                     # noqa: E402
+from strategy.grade import canal_de_abertura, simular                  # noqa: E402
 from strategy.ichimoku import simular_ichimoku                           # noqa: E402
 
 PASTA = Path(__file__).resolve().parent
@@ -73,6 +73,7 @@ class Robo:
         self.dia_corrente, self.patrimonio_inicio_dia, self.pausado_ate = None, None, None
         self.fechou_dia: str | None = None
         self.offset = pd.Timedelta(0)     # relogio da estrategia - relogio do servidor
+        self.canais_anunciados: set[str] = set()
 
     # ------------------------------------------------------------- seguranca
     def checar_conta(self) -> None:
@@ -116,10 +117,30 @@ class Robo:
         fim = pd.Timestamp(ultima.date()) + pd.Timedelta(minutes=math.floor(ultimo_min / tf) * tf)
         vivo = {"fim_previsto": fim}
         if pista.tipo == "grade":
+            self.anunciar_canal(pista, d, ultima)
             simular(d, pista.params, pista.custos, pista.ponto, ao_vivo=vivo)
         else:
             simular_ichimoku(d, pista.params, pista.custos, pista.ponto, ao_vivo=vivo)
         return vivo["pos"], ultima, float(d["fechamento"].iloc[-1])
+
+    def anunciar_canal(self, pista, d: pd.DataFrame, ultima) -> None:
+        """Uma vez por dia: o canal e a grade da grade, para tracar no grafico."""
+        chave = f"{pista.nome}|{ultima.date()}"
+        if chave in self.canais_anunciados:
+            return
+        dias = sorted(d["tempo_ativo"].dt.date.unique())
+        if len(dias) < 2 or dias[-1] != ultima.date():
+            return
+        hoje = d[d["tempo_ativo"].dt.date == dias[-1]].reset_index(drop=True)
+        ontem = d[d["tempo_ativo"].dt.date == dias[-2]]
+        canal = canal_de_abertura(hoje, float((ontem["maxima"] - ontem["minima"]).median()), pista.params)
+        if canal is None:
+            return
+        base, w, _ = canal
+        self.canais_anunciados.add(chave)
+        grade = "  ".join(f"{base + k * w:.2f}" for k in range(-4, 6))
+        log(f"{pista.nome} ({pista.tf}): canal de hoje {base:.2f} a {base + w:.2f} (largura {w:.2f}). "
+            f"Niveis da grade: {grade}")
 
     # -------------------------------------------------------------- ordens
     def posicoes(self, pista) -> list:
@@ -249,15 +270,30 @@ class Robo:
                 self.fechou_dia = hoje
             return
 
-        dados = {}
+        dados, status, houve_vela = {}, [], False
         for pista in PISTAS:
             if pista.mercado not in dados:
                 dados[pista.mercado] = self.m1_recente(pista.mercado)
             desejado, ultima, preco = self.avaliar(pista, dados[pista.mercado], agora)
+            status.append(self.descrever(pista, desejado, preco))
             if ultima is None or self.ultima_barra.get(pista.nome) == ultima:
                 continue
+            houve_vela = True
             self.ultima_barra[pista.nome] = ultima
             self.alinhar(pista, desejado, ultima, preco)
+        if houve_vela:
+            log(f"status {agora:%H:%M} servidor | " + " | ".join(status))
+
+    def descrever(self, pista, desejado, preco) -> str:
+        """Uma linha curta: o que a estrategia manda e o que o robo tem."""
+        if pista.nome == "P1-A" and self.agora_servidor("XAUUSD").weekday() > 2:
+            return f"{pista.nome}: fora (so opera dom-qua)"
+        tem = "com posicao" if self.posicoes(pista) else "sem posicao"
+        if desejado is None:
+            return f"{pista.nome}: estrategia fora, robo {tem}"
+        lado = "comprada" if desejado["dir"] > 0 else "vendida"
+        desde = pd.Timestamp(desejado["t"]) - self.offset
+        return f"{pista.nome}: estrategia {lado} desde {desde:%H:%M}, robo {tem}"
 
     def rodar(self) -> None:
         self.checar_conta()
