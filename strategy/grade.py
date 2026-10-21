@@ -115,6 +115,9 @@ class ParametrosGrade:
     #   "sempre"  carrega ate stop / alvo / 0x0, inclusive no fim de semana.
     # Stop, alvo e 0x0 continuam nos precos do dia da entrada.
     carregar_posicao: str = "nao"
+    # Com o canal semanal (simular(periodo="semana")), fecha a posicao no fim de
+    # cada dia de negociacao (sessao) em vez de so na sexta.
+    fechar_fim_de_cada_sessao: bool = False
     # "Surfar a cada nivel" (A4 23:46): depois do 0x0, cada vez que uma vela
     # FECHA k niveis alem da entrada, o stop sobe para k-1 niveis.
     surfar: bool = False
@@ -295,6 +298,7 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
     fim_sessao = dia.groupby("sessao_id")["tempo_ativo"].transform("max")
     minutos_ate_fim = ((pd.DatetimeIndex(fim_sessao) - tempos_ts)
                        .total_seconds().to_numpy() / 60)
+    ultimo_da_sessao = np.r_[sessao[1:] != sessao[:-1], True]
     if fim_previsto is not None:
         minutos_ate_fim = (pd.Timestamp(fim_previsto) - tempos_ts).total_seconds().to_numpy() / 60
         # Se a vela atual ja e a ultima do dia, o dia acabou: fecha como no backtest.
@@ -403,6 +407,9 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
                 novo = pos["entrada"] + d * max(k - 1, 0) * wp
                 if (novo - pos["stop"]) * d > 0:
                     pos["stop"] = novo
+            if (pos is not None and p.fechar_fim_de_cada_sessao and ultimo_da_sessao[i]
+                    and i < n - 1):
+                fechar(i, f[i], "fim_do_dia")
             if pos is not None and i == n - 1 and not em_andamento:
                 if carregar and saida is not None:
                     saida["pos"] = pos
@@ -432,6 +439,7 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
         # ---------------- 3. abrir ------------------------------------------
         if (sinal == 0 or pos is not None or est.encerrado or sem_entradas
                 or (i == n - 1 and not em_andamento)
+                or (p.dias_semana is not None and tempos_ts[i].weekday() not in p.dias_semana)
                 or minutos_ate_fim[i] < p.sem_entrada_antes_do_fim_min):
             bloqueio = ("" if sinal == 0 else "posicionado" if pos is not None
                         else "dia encerrado" if est.encerrado

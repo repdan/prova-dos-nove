@@ -304,6 +304,23 @@ def test_surfar_a_cada_nivel_sobe_o_stop():
     assert t[0].motivo == "stop" and t[0].preco_saida == pytest.approx(1220)
 
 
+def test_canal_semanal_vale_para_a_semana_e_fecha_cada_dia():
+    """Canal na 1a vela de segunda (B=1000, w=100); na terca, fechar acima do NR
+    pela grade de segunda e entrada. A posicao fecha no fim da terca."""
+    from strategy.grade import simular
+    p = replace(BASE, tendencia="neutra", fechar_fim_de_cada_sessao=True, take_niveis=5, usar_0x0=False)
+    ref = dia([ABERTURA, ABERTURA], inicio="2024-02-26 09:15", sessao=0)
+    seg = dia([ABERTURA, (1080, 1090, 1060, 1070), (1070, 1080, 1065, 1075)], inicio="2024-03-04 09:15", sessao=1)
+    ter = dia([(1075, 1130, 1070, 1120), (1120, 1150, 1115, 1140), (1140, 1145, 1135, 1142)],
+              inicio="2024-03-05 09:15", sessao=2)
+    qua = dia([(1142, 1150, 1138, 1145), (1145, 1146, 1140, 1141)], inicio="2024-03-06 09:15", sessao=3)
+    t = simular(pd.concat([ref, seg, ter, qua], ignore_index=True), p, SEM_CUSTO, periodo="semana")
+    assert len(t) == 1
+    tr = t.iloc[0]
+    assert pd.Timestamp(tr["tempo_entrada"]).day == 5 and tr["preco_entrada"] == 1120
+    assert tr["motivo"] == "fim_do_dia" and pd.Timestamp(tr["tempo_saida"]).day == 5
+
+
 def test_custo_e_cobrado_nas_duas_pontas():
     """Spread inteiro no giro + derrapagem por ponta + comissao."""
     velas = [ABERTURA, (1080, 1130, 1075, 1120), (1120, 1225, 1115, 1180)]

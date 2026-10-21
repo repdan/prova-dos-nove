@@ -1,0 +1,56 @@
+﻿
+  OURO, abertura corretora, M15
+  versao                                     trades  acerto       sem custo         ESPELHO       com custo     ESP c/custo   R/ano
+  ---------------------------------------------------------------------------------------------------------------------------------
+  canal DIARIO, gestao semanal dom-qua          709     47%  +0.011R  +0.2s  +0.002R  +0.0s  -0.057R  -1.3s  -0.066R  -1.5s    -5.2
+  canal SEMANAL, fecha cada dia, seg-sex        742     47%  -0.007R  -0.2s  +0.030R  +0.7s  -0.066R  -1.5s  -0.029R  -0.7s    -6.3
+  canal SEMANAL, fecha cada dia, dom-qua        717     47%  +0.002R  +0.0s  +0.031R  +0.7s  -0.059R  -1.3s  -0.029R  -0.7s    -5.4
+  canal SEMANAL, carrega na semana              669     46%  -0.012R  -0.3s  +0.036R  +0.8s  -0.077R  -1.6s  -0.028R  -0.6s    -6.6
+
+  OURO, abertura corretora, M30
+  versao                                     trades  acerto       sem custo         ESPELHO       com custo     ESP c/custo   R/ano
+  ---------------------------------------------------------------------------------------------------------------------------------
+  canal DIARIO, gestao semanal dom-qua          720     50%  +0.009R  +0.2s  -0.010R  -0.2s  -0.052R  -1.1s  -0.069R  -1.5s    -4.8
+  canal SEMANAL, fecha cada dia, seg-sex        795     46%  -0.059R  -1.4s  +0.035R  +0.9s  -0.107R  -2.6s  -0.012R  -0.3s   -11.0
+  canal SEMANAL, fecha cada dia, dom-qua        749     46%  -0.058R  -1.3s  +0.034R  +0.8s  -0.109R  -2.5s  -0.015R  -0.4s   -10.4
+  canal SEMANAL, carrega na semana              665     48%  -0.047R  -0.9s  +0.027R  +0.6s  -0.104R  -2.0s  -0.025R  -0.5s    -8.8
+
+  OURO, abertura corretora, H1
+  versao                                     trades  acerto       sem custo         ESPELHO       com custo     ESP c/custo   R/ano
+  ---------------------------------------------------------------------------------------------------------------------------------
+  canal DIARIO, gestao semanal dom-qua          716     53%  +0.006R  +0.1s  -0.052R  -1.1s  -0.045R  -1.0s  -0.105R  -2.3s    -4.2
+  canal SEMANAL, fecha cada dia, seg-sex        809     49%  -0.042R  -1.0s  -0.006R  -0.1s  -0.081R  -2.0s  -0.046R  -1.2s    -8.5
+  canal SEMANAL, fecha cada dia, dom-qua        738     49%  -0.045R  -1.0s  -0.010R  -0.2s  -0.087R  -2.0s  -0.052R  -1.2s    -8.2
+  canal SEMANAL, carrega na semana              629     51%  -0.029R  -0.5s  -0.048R  -1.0s  -0.077R  -1.4s  -0.098R  -1.9s    -6.2
+
+  OURO, abertura NY, M15
+  versao                                     trades  acerto       sem custo         ESPELHO       com custo     ESP c/custo   R/ano
+  ---------------------------------------------------------------------------------------------------------------------------------
+  canal DIARIO, gestao semanal dom-qua          904     51%  +0.065R  +2.0s  -0.024R  -0.7s  +0.016R  +0.5s  -0.073R  -2.2s    +1.8
+  canal SEMANAL, fecha cada dia, seg-sex        993     51%  +0.031R  +1.0s  -0.033R  -1.0s  -0.015R  -0.5s  -0.078R  -2.5s    -2.0
+  canal SEMANAL, fecha cada dia, dom-qua        905     51%  +0.033R  +1.0s  -0.023R  -0.7s  -0.015R  -0.5s  -0.070R  -2.1s    -1.8
+  canal SEMANAL, carrega na semana              624     53%  -0.133R  -1.9s  -0.213R  -3.6s  -0.196R  -2.9s  -0.279R  -4.6s   -15.7
+
+  OURO, abertura NY, M30
+  versao                                     trades  acerto       sem custo         ESPELHO       com custo     ESP c/custo   R/ano
+  ---------------------------------------------------------------------------------------------------------------------------------
+  canal DIARIO, gestao semanal dom-qua         1026     49%  +0.045R  +1.9s  -0.042R  -1.7s  +0.009R  +0.4s  -0.079R  -3.2s    +1.1
+  canal SEMANAL, fecha cada dia, seg-sex       1260     50%  +0.038R  +1.7s  -0.035R  -1.5s  +0.005R  +0.2s  -0.068R  -2.9s    +0.9
+  canal SEMANAL, fecha cada dia, dom-qua       1007     49%  +0.039R  +1.5s  -0.018R  -0.7s  +0.003R  +0.1s  -0.053R  -2.0s    +0.4
+  canal SEMANAL, carrega na semana              621     52%  -0.155R  -2.4s  -0.189R  -3.0s  -0.209R  -3.2s  -0.246R  -3.9s   -16.6
+
+  OURO, abertura NY, H1
+  versao                                     trades  acerto       sem custo         ESPELHO       com custo     ESP c/custo   R/ano
+  ---------------------------------------------------------------------------------------------------------------------------------
+  canal DIARIO, gestao semanal dom-qua          894     47%  +0.020R  +1.1s  -0.023R  -1.2s  -0.006R  -0.3s  -0.048R  -2.6s    -0.7
+  canal SEMANAL, fecha cada dia, seg-sex       1375     48%  +0.012R  +0.7s  -0.036R  -2.1s  -0.013R  -0.8s  -0.061R  -3.5s    -2.3
+  canal SEMANAL, fecha cada dia, dom-qua        942     47%  -0.001R  -0.0s  -0.031R  -1.5s  -0.028R  -1.3s  -0.058R  -2.8s    -3.4
+  canal SEMANAL, carrega na semana              635     50%  -0.202R  -3.5s  -0.154R  -2.4s  -0.255R  -4.4s  -0.205R  -3.1s   -20.8
+
+  Por ano, com custo (metodo | espelho), canal SEMANAL fechando cada dia, seg-sex:
+    corretora M15  2019:-0.34|-0.16  2020:-0.14|+0.02  2021:-0.24|+0.22  2022:-0.01|-0.23  2023:+0.05|+0.04  2024:-0.02|+0.04  2025:+0.21|-0.18  2026:-0.07|+0.07
+    corretora M30  2019:-0.40|-0.03  2020:-0.22|+0.19  2021:-0.24|+0.20  2022:-0.02|-0.22  2023:-0.09|-0.02  2024:-0.02|+0.11  2025:+0.12|-0.24  2026:-0.04|+0.03
+    corretora H1   2019:-0.37|-0.16  2020:-0.28|+0.11  2021:-0.23|+0.16  2022:+0.11|-0.23  2023:+0.07|-0.09  2024:+0.05|-0.00  2025:-0.01|-0.15  2026:-0.09|+0.08
+    NY        M15  2019:-0.08|-0.09  2020:-0.04|-0.13  2021:-0.07|-0.07  2022:+0.00|-0.17  2023:+0.09|-0.10  2024:-0.11|-0.05  2025:+0.05|-0.05  2026:+0.07|+0.08
+    NY        M30  2019:+0.04|-0.07  2020:-0.01|-0.11  2021:-0.10|-0.02  2022:-0.03|-0.11  2023:+0.02|-0.10  2024:+0.01|-0.01  2025:+0.10|-0.13  2026:+0.03|+0.03
+    NY        H1   2019:-0.08|-0.05  2020:+0.00|-0.09  2021:-0.14|+0.07  2022:-0.01|-0.04  2023:+0.00|-0.10  2024:+0.08|-0.18  2025:+0.06|-0.04  2026:-0.02|+0.01
