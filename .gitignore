@@ -7,3 +7,6 @@ reports/*.png
 reports/*.html
 ml/modelos/*.pkl
 .pytest_cache/
+
+# M1: grande demais para versionar; os coletores em analises/ recriam
+data/historico/**/*_M1_*.parquet

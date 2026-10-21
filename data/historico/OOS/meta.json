@@ -1,0 +1,20 @@
+{
+ "FR40": {
+  "ponto": 0.01,
+  "usd_por_ponto_lote": 1.12,
+  "spread_atual": 1.0,
+  "spread_mediano_hist": 1.0
+ },
+ "ES35": {
+  "ponto": 0.01,
+  "usd_por_ponto_lote": 1.12,
+  "spread_atual": 6.5,
+  "spread_mediano_hist": 6.3500000000000005
+ },
+ "CN50": {
+  "ponto": 0.01,
+  "usd_por_ponto_lote": 1.0,
+  "spread_atual": 10.0,
+  "spread_mediano_hist": 10.0
+ }
+}
