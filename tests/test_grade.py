@@ -257,6 +257,53 @@ def test_gestao_semanal_so_nos_dias_permitidos():
     assert len(t) == 1 and pd.Timestamp(t["tempo_entrada"].iloc[0]).day == 5
 
 
+def test_carregar_posicao_para_o_dia_seguinte():
+    """Compra na segunda sem bater nada; na terca o alvo (1220) e atingido."""
+    from strategy.grade import simular
+    p = replace(BASE, tendencia="neutra", carregar_posicao="semana")
+    seg = dia([ABERTURA, (1080, 1130, 1075, 1120), (1120, 1125, 1115, 1121)], inicio="2024-03-04 09:15")
+    ter = dia([(1121, 1140, 1118, 1135), (1135, 1225, 1130, 1215), (1215, 1216, 1210, 1212)],
+              inicio="2024-03-05 09:15")
+    ref = dia([ABERTURA, ABERTURA], inicio="2024-03-01 09:15")
+    df = pd.concat([ref, seg, ter], ignore_index=True)
+    fecha = simular(df, replace(p, carregar_posicao="nao"), SEM_CUSTO)
+    carrega = simular(df, p, SEM_CUSTO)
+    assert fecha["motivo"].iloc[0] == "fim_do_dia"
+    assert carrega["motivo"].iloc[0] == "take"
+    assert pd.Timestamp(carrega["tempo_saida"].iloc[0]).day == 5
+
+
+def test_carregar_na_sexta_fecha_se_a_regra_e_semana():
+    from strategy.grade import simular
+    p = replace(BASE, tendencia="neutra", carregar_posicao="semana")
+    sex = dia([ABERTURA, (1080, 1130, 1075, 1120), (1120, 1125, 1115, 1121)], inicio="2024-03-08 09:15")
+    seg = dia([(1121, 1140, 1118, 1135), (1135, 1225, 1130, 1215), (1215, 1216, 1210, 1212)],
+              inicio="2024-03-11 09:15")
+    t = simular(pd.concat([dia([ABERTURA, ABERTURA], inicio="2024-03-07 09:15"), sex, seg], ignore_index=True), p, SEM_CUSTO)
+    assert t["motivo"].iloc[0] == "fim_do_dia"
+
+
+def test_swap_nao_cobra_fim_de_semana():
+    """Comprado de sexta a segunda: so a rolagem de sexta (1 noite, quarta e a tripla)."""
+    from strategy.grade import simular
+    c = Custos(slippage=0, comissao_pontos=0, spread_forcado=0.0, swap_compra=-1.0, dia_triplo=2)
+    p = replace(BASE, tendencia="neutra", carregar_posicao="sempre", take_niveis=0, usar_0x0=False)
+    sex = dia([ABERTURA, (1080, 1130, 1075, 1120), (1120, 1125, 1115, 1121)], inicio="2024-03-08 09:15")
+    seg = dia([(1121, 1140, 1118, 1135), (1135, 1140, 1130, 1138), (1138, 1139, 985, 990)],
+              inicio="2024-03-11 09:15")
+    t = simular(pd.concat([dia([ABERTURA, ABERTURA], inicio="2024-03-07 09:15"), sex, seg], ignore_index=True), p, c)
+    assert t["custo"].iloc[0] == pytest.approx(1.0)
+
+
+def test_surfar_a_cada_nivel_sobe_o_stop():
+    """Entrada 1120, w=100. Fecha em 1330 (2 niveis): stop vai a 1220. Volta: sai em 1220."""
+    p = replace(BASE, take_niveis=0, surfar=True)
+    velas = [ABERTURA, (1080, 1130, 1075, 1120), (1120, 1225, 1118, 1222),
+             (1222, 1335, 1220, 1330), (1330, 1331, 1200, 1210), (1210, 1211, 1205, 1206)]
+    t = rodar(velas, p=p)
+    assert t[0].motivo == "stop" and t[0].preco_saida == pytest.approx(1220)
+
+
 def test_custo_e_cobrado_nas_duas_pontas():
     """Spread inteiro no giro + derrapagem por ponta + comissao."""
     velas = [ABERTURA, (1080, 1130, 1075, 1120), (1120, 1225, 1115, 1180)]

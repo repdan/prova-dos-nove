@@ -109,6 +109,15 @@ class ParametrosGrade:
     gestao_semanal: bool = False
     stops_semana: int = 2
     dias_semana: tuple[int, ...] | None = None
+    # O que fazer com a posicao aberta no fim do dia:
+    #   "nao"     fecha no fim do dia (padrao de referencia no HK50);
+    #   "semana"  carrega para o dia seguinte, mas fecha na sexta;
+    #   "sempre"  carrega ate stop / alvo / 0x0, inclusive no fim de semana.
+    # Stop, alvo e 0x0 continuam nos precos do dia da entrada.
+    carregar_posicao: str = "nao"
+    # "Surfar a cada nivel" (A4 23:46): depois do 0x0, cada vez que uma vela
+    # FECHA k niveis alem da entrada, o stop sobe para k-1 niveis.
+    surfar: bool = False
 
     # --- controle -----------------------------------------------------------
     # Mesmas entradas, sentido oposto, mesmo risco e mesmo take. Nao e uma
@@ -241,7 +250,8 @@ def _nivel(x: float, base: float, w: float) -> int:
 def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
                 amp_ref: float, p: ParametrosGrade, custos: Custos,
                 ponto: float = 0.01, rastro: list | None = None,
-                vies_inicial: int | None = None) -> list[TradeGrade]:
+                vies_inicial: int | None = None, pos_herdada: dict | None = None,
+                sem_entradas: bool = False, saida: dict | None = None) -> list[TradeGrade]:
     """Roda um pregao. `dia` precisa estar em ordem e conter so este dia.
 
     amp_ref: amplitude mediana das velas do dia ANTERIOR - escala do "canal
@@ -249,11 +259,20 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
 
     rastro: se for uma lista, recebe o estado da maquina a cada vela (para o
     replay visual). Nao altera nenhuma decisao.
+
+    pos_herdada / saida: posicao que veio aberta do dia anterior, e o dict que
+    recebe ("pos") a que fica aberta no fim deste dia (p.carregar_posicao).
+    sem_entradas: so administra a posicao herdada, sem abrir nada novo.
     """
     canal = canal_de_abertura(dia, amp_ref, p)
-    if canal is None:
+    if canal is None and pos_herdada is None:
         return []
-    base, w, ultima_do_canal = canal
+    if canal is None:
+        # Dia sem canal, mas com posicao herdada: so administra.
+        base, w, ultima_do_canal = 0.0, pos_herdada["w"], len(dia) - 1
+        sem_entradas = True
+    else:
+        base, w, ultima_do_canal = canal
 
     a = dia["abertura"].to_numpy(float)
     mx = dia["maxima"].to_numpy(float)
@@ -280,8 +299,10 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
     est.cr = 0
 
     trades: list[TradeGrade] = []
-    pos: dict | None = None
+    pos: dict | None = pos_herdada
     n = len(dia)
+    sexta = tempos_ts[0].weekday() == 4
+    carregar = p.carregar_posicao == "sempre" or (p.carregar_posicao == "semana" and not sexta)
 
     def custo_ponta(i: int) -> float:
         return spreads[i] / 2 + custos.slippage
@@ -293,15 +314,18 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
         custo = pos["custo_entrada"] + custo_ponta(i) + custos.comissao_pontos
         taxa = custos.swap_compra if d > 0 else custos.swap_venda
         if taxa:
+            # Uma rolagem por dia util entre a entrada e a saida; a do dia
+            # triplo vale 3 (cobre o fim de semana). Sabado e domingo: zero.
             d0, d1 = pos["t"].date(), tempos_ts[i].date()
-            noites = sum(3 if (d0 + pd.Timedelta(days=k)).weekday() == custos.dia_triplo else 1
-                         for k in range((d1 - d0).days))
+            dias_ = [d0 + pd.Timedelta(days=k) for k in range((d1 - d0).days)]
+            noites = sum(3 if x.weekday() == custos.dia_triplo else 1
+                         for x in dias_ if x.weekday() < 5)
             custo -= taxa * noites      # swap negativo vira custo; positivo, credito
         trades.append(TradeGrade(
-            dia=tempos_ts[0].date(), direcao=d, tipo=pos["tipo"],
+            dia=pos.get("dia", tempos_ts[0].date()), direcao=d, tipo=pos["tipo"],
             tempo_entrada=pos["t"], tempo_saida=tempos_ts[i],
             preco_entrada=pos["entrada"], preco_saida=preco,
-            stop_inicial=pos["stop0"], take=pos["take"], largura=w,
+            stop_inicial=pos["stop0"], take=pos["take"], largura=pos.get("w", w),
             motivo=motivo, custo=custo, resultado_bruto=bruto,
             resultado=bruto - custo, risco=pos["risco"], foi_0x0=pos["be"]))
         eventos.append({"tipo": "saida", "motivo": motivo, "preco": float(preco),
@@ -334,12 +358,8 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
         rastro.append({"canal": {"base": float(base), "w": float(w),
                                  "ultima": int(ultima_do_canal), "vies": est.vies}})
 
-    for i in range(ultima_do_canal + 1, n):
-        eventos.clear()
-        # ---------------- 1. posicao aberta: take, stop, 0x0, fim do dia ----
-        # Fechar NAO pula o candle: ele ainda passa pela grade no passo 2, que
-        # e como a nova entrada acontece - tomou o stop, o mesmo fechamento ja pode
-        # ser o sinal do outro lado.
+    def gerir(i: int) -> None:
+        """Stop, take, 0x0 e fim do dia da posicao aberta, na vela i."""
         if pos is not None:
             d = pos["dir"]
             # Dentro da vela, sem saber a ordem dos eventos, assume-se o pior:
@@ -356,24 +376,50 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
                 bateu = mx[i] >= pos["take"] if d > 0 else mn[i] <= pos["take"]
                 if bateu:
                     fechar(i, pos["take"], "take")
-            gatilho = (w if p.gatilho_0x0_r is None
-                       else p.gatilho_0x0_r * pos["risco"] if pos is not None else 0)
+            gatilho = (0 if pos is None
+                       else pos.get("w", w) if p.gatilho_0x0_r is None
+                       else p.gatilho_0x0_r * pos["risco"])
             if (pos is not None and p.usar_0x0 and not pos["be"]
                     and (f[i] - pos["entrada"]) * d >= gatilho):
                 pos["be"] = True
                 pos["stop"] = pos["entrada"]
                 eventos.append({"tipo": "0x0"})
+            if pos is not None and p.surfar and pos["be"]:
+                wp = pos.get("w", w)
+                k = math.floor((f[i] - pos["entrada"]) * d / wp + 1e-9)
+                novo = pos["entrada"] + d * max(k - 1, 0) * wp
+                if (novo - pos["stop"]) * d > 0:
+                    pos["stop"] = novo
             if pos is not None and i == n - 1:
-                fechar(i, f[i], "fim_do_dia")
+                if carregar and saida is not None:
+                    saida["pos"] = pos
+                else:
+                    fechar(i, f[i], "fim_do_dia")
+
+    # Posicao herdada: administrada tambem enquanto o canal do dia se forma.
+    if pos is not None:
+        for i in range(0, ultima_do_canal + 1):
+            gerir(i)
+    if canal is None:
+        return trades
+
+    for i in range(ultima_do_canal + 1, n):
+        eventos.clear()
+        # ---------------- 1. posicao aberta: take, stop, 0x0, fim do dia ----
+        # Fechar NAO pula o candle: ele ainda passa pela grade no passo 2, que
+        # e como a nova entrada acontece - tomou o stop, o mesmo fechamento ja pode
+        # ser o sinal do outro lado.
+        gerir(i)
 
         # ---------------- 2. maquina de estados sobre a grade --------------
         sinal, tipo, _ = passo_da_grade(est, f[i], base, w, p)
 
         # ---------------- 3. abrir ------------------------------------------
-        if (sinal == 0 or pos is not None or est.encerrado or i == n - 1
+        if (sinal == 0 or pos is not None or est.encerrado or i == n - 1 or sem_entradas
                 or minutos_ate_fim[i] < p.sem_entrada_antes_do_fim_min):
             bloqueio = ("" if sinal == 0 else "posicionado" if pos is not None
-                        else "dia encerrado" if est.encerrado else "fim da sessao")
+                        else "dia encerrado" if est.encerrado
+                        else "dia sem operacao" if sem_entradas else "fim da sessao")
             registrar(i, sinal, tipo, bloqueio)
             continue
 
@@ -403,7 +449,8 @@ def simular_dia(dia: pd.DataFrame, fechamento_anterior: float | None,
             take = (entrada + sinal * p.take_niveis * w) if p.take_niveis > 0 else None
         pos = {"dir": sinal, "tipo": tipo, "t": tempos_ts[i], "entrada": entrada,
                "stop": stop, "stop0": stop, "take": take, "risco": risco,
-               "be": False, "custo_entrada": custo_ponta(i)}
+               "be": False, "custo_entrada": custo_ponta(i),
+               "w": w, "dia": tempos_ts[0].date()}
         eventos.append({"tipo": "entrada"})
         registrar(i, sinal, tipo)
 
@@ -482,6 +529,7 @@ def simular(df: pd.DataFrame, p: ParametrosGrade, custos: Custos,
     linhas = []
     anterior = None
     semana, ganhou, stops = None, False, 0
+    herdada = None          # posicao que atravessou a virada do dia
     for dia, bloco in df.groupby(dias, sort=True):
         pula = False
         if p.gestao_semanal:
@@ -490,17 +538,21 @@ def simular(df: pd.DataFrame, p: ParametrosGrade, custos: Custos,
                 semana, ganhou, stops = sem, False, 0
             pula = (ganhou or stops >= p.stops_semana
                     or (p.dias_semana is not None and pd.Timestamp(dia).weekday() not in p.dias_semana))
-        if anterior is not None and not pula:
+        if anterior is not None and (not pula or herdada is not None):
             pd_ = p
             if p.gestao_semanal:
-                pd_ = replace(p, max_stops_dia=p.stops_semana - stops, parar_no_take=True)
+                pd_ = replace(p, max_stops_dia=max(p.stops_semana - stops, 1), parar_no_take=True)
             amp_ref = float((anterior["maxima"] - anterior["minima"]).median())
             fech_ant = float(anterior["fechamento"].iloc[-1])
             vies = None
             if p.tendencia == "dia_anterior":
                 vies = int(np.sign(fech_ant - float(anterior["abertura"].iloc[0])))
-            for t in simular_dia(bloco.reset_index(drop=True), fech_ant,
-                                 amp_ref, pd_, custos, ponto, vies_inicial=vies):
+            saida: dict = {}
+            trades_dia = simular_dia(bloco.reset_index(drop=True), fech_ant, amp_ref, pd_,
+                                     custos, ponto, vies_inicial=vies, pos_herdada=herdada,
+                                     sem_entradas=pula, saida=saida)
+            herdada = saida.get("pos")
+            for t in trades_dia:
                 linhas.append({**t.__dict__, "r": t.r})
                 ganhou = ganhou or t.motivo == "take"
                 stops += int(t.motivo == "stop" and not t.foi_0x0)
