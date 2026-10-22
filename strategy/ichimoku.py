@@ -66,12 +66,17 @@ def nuvem(df: pd.DataFrame, p: ParametrosIchimoku) -> tuple[np.ndarray, np.ndarr
 
 
 def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
-                     ponto: float = 0.01, ao_vivo: dict | None = None) -> pd.DataFrame:
+                     ponto: float = 0.01, ao_vivo: dict | None = None,
+                     permitir_compra=None, permitir_venda=None) -> pd.DataFrame:
     """df: velas em ordem com coluna 'dia' (posicao fecha na ultima vela do dia).
 
     ao_vivo: dict com "fim_previsto" (fim do dia corrente). A ultima vela e
     "agora": o dia corrente nao fecha, e a posicao que deve estar aberta volta
     em ao_vivo["pos"].
+
+    permitir_compra / permitir_venda: arrays booleanos alinhados com df (filtros
+    de entrada). Calculados so com dados ate cada vela; bloqueiam ENTRADAS, nunca
+    saidas - um trade filtrado muda os seguintes, como na pratica.
     """
     df = df.reset_index(drop=True)
     sup, inf = nuvem(df, p)
@@ -152,6 +157,10 @@ def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
                 or min_ate_fim[i] < p.sem_entrada_antes_do_fim_min):
             continue
         if p.so_fortes and not forte:
+            continue
+        if sinal > 0 and permitir_compra is not None and not permitir_compra[i]:
+            continue
+        if sinal < 0 and permitir_venda is not None and not permitir_venda[i]:
             continue
         if p.nuvem_fina is not None and not (sup[i] - inf[i] < p.nuvem_fina * amp[i]):
             continue

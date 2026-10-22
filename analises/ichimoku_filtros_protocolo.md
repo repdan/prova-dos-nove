@@ -44,3 +44,9 @@ Cada um decide, na vela do sinal e só com dados até ela, se a entrada é permi
   distinguíveis na entrada, e o método fica como está.
 - Confirmado: vira uma **pista nova** (P3), congelada e com contagem própria. As
   pistas atuais não mudam.
+
+## Desvio registrado antes do teste
+
+O EURUSD da corretora so tem M1 real a partir de 2024 (antes, 1 vela por dia).
+Nele a confirmacao usa 2024-2026. Limitacao de dado, nao escolha feita apos resultado.
+
