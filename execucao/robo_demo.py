@@ -236,7 +236,7 @@ class Robo:
                 self.estado["entradas"][chave] = datetime.now().isoformat()
                 self.salvar_estado()
             elif chave not in self.estado["entradas"]:
-                desde = pd.Timestamp(desejado["t"]) - self.offset
+                desde = pd.Timestamp(desejado["t"]) - self.offset + pd.Timedelta(minutes=TFS[pista.tf])
                 log(f"{pista.nome}: a estrategia esta posicionada desde {desde:%d/%m %H:%M} (servidor), "
                     f"mas a entrada ja passou - nao entra atrasado.")
                 self.estado["entradas"][chave] = "perdida"
@@ -275,12 +275,12 @@ class Robo:
             if pista.mercado not in dados:
                 dados[pista.mercado] = self.m1_recente(pista.mercado)
             desejado, ultima, preco = self.avaliar(pista, dados[pista.mercado], agora)
+            if ultima is not None and self.ultima_barra.get(pista.nome) != ultima:
+                houve_vela = True
+                self.ultima_barra[pista.nome] = ultima
+                self.alinhar(pista, desejado, ultima, preco)
+            # Depois de alinhar, para o status mostrar o que o robo tem AGORA.
             status.append(self.descrever(pista, desejado, preco))
-            if ultima is None or self.ultima_barra.get(pista.nome) == ultima:
-                continue
-            houve_vela = True
-            self.ultima_barra[pista.nome] = ultima
-            self.alinhar(pista, desejado, ultima, preco)
         if houve_vela:
             log(f"status {agora:%H:%M} servidor | " + " | ".join(status))
 
@@ -292,7 +292,8 @@ class Robo:
         if desejado is None:
             return f"{pista.nome}: estrategia fora, robo {tem}"
         lado = "comprada" if desejado["dir"] > 0 else "vendida"
-        desde = pd.Timestamp(desejado["t"]) - self.offset
+        # Entrada no FECHAMENTO da vela do sinal: inicio da vela + tempo grafico.
+        desde = pd.Timestamp(desejado["t"]) - self.offset + pd.Timedelta(minutes=TFS[pista.tf])
         return f"{pista.nome}: estrategia {lado} desde {desde:%H:%M}, robo {tem}"
 
     def rodar(self) -> None:
