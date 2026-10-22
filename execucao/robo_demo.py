@@ -57,11 +57,20 @@ FECHAR_AS = (23, 57)           # fechamento compulsorio do dia (servidor)
 PERDA_MAXIMA_DIA = 0.03
 
 
-def log(msg: str) -> None:
-    linha = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {msg}"
-    print(linha, flush=True)
+def escrever(linhas: list[str]) -> None:
+    """Terminal e robo.log. So ASCII, para nenhum terminal do Windows engasgar."""
+    texto = "\n".join(linhas)
+    print(texto, flush=True)
     with LOG.open("a", encoding="utf-8") as f:
-        f.write(linha + "\n")
+        f.write(texto + "\n")
+
+
+def log(msg: str) -> None:
+    escrever([f"{datetime.now():%Y-%m-%d %H:%M:%S}  {msg}"])
+
+
+DESCRICAO = {"P1-A": "ouro    M15  Grade ", "P1-B": "ouro    M30  Grade ",
+             "P2-USDJPY": "USDJPY  M15  Ichimoku", "P2-ouro": "ouro    M15  Ichimoku"}
 
 
 class Robo:
@@ -74,6 +83,15 @@ class Robo:
         self.fechou_dia: str | None = None
         self.offset = pd.Timedelta(0)     # relogio da estrategia - relogio do servidor
         self.canais_anunciados: set[str] = set()
+        self.canal_do_dia: dict[str, tuple] = {}   # pista -> (data, base, largura)
+        self.avisos: list[str] | None = None       # acoes da vela atual, impressas no bloco
+
+    def aviso(self, msg: str) -> None:
+        """Durante um ciclo, guarda para o bloco da vela; fora dele, imprime na hora."""
+        if self.avisos is not None:
+            self.avisos.append(msg)
+        else:
+            log(msg)
 
     # ------------------------------------------------------------- seguranca
     def checar_conta(self) -> None:
@@ -138,9 +156,10 @@ class Robo:
             return
         base, w, _ = canal
         self.canais_anunciados.add(chave)
+        self.canal_do_dia[pista.nome] = (ultima.date(), base, w)
         grade = "  ".join(f"{base + k * w:.2f}" for k in range(-4, 6))
-        log(f"{pista.nome} ({pista.tf}): canal de hoje {base:.2f} a {base + w:.2f} (largura {w:.2f}). "
-            f"Niveis da grade: {grade}")
+        self.aviso(f"{pista.nome}: canal de hoje {base:.2f} a {base + w:.2f} (largura {w:.2f})")
+        self.aviso(f"{' ' * len(pista.nome)}  niveis para tracar: {grade}")
 
     # -------------------------------------------------------------- ordens
     def posicoes(self, pista) -> list:
@@ -176,7 +195,7 @@ class Robo:
         lado = "COMPRA" if d > 0 else "VENDA"
         if not self.valendo:
             self.virtual[pista.nome] = {"dir": d, "t": desejado["t"]}
-            log(f"[simulacao] {pista.nome}: {lado} 0,01 a ~{preco_sim} (stop de protecao {sl}, alvo {tp or '-'})")
+            self.aviso(f"[simulacao] {pista.nome}: {lado} 0,01 a ~{preco_sim} (stop de protecao {sl}, alvo {tp or '-'})")
             self.registrar(pista, f"abre {lado}", preco_sim, "", "", f"sl {sl} tp {tp}")
             return
         tick = mt5.symbol_info_tick(pista.mercado)
@@ -186,13 +205,13 @@ class Robo:
                   "magic": MAGIC[pista.nome], "comment": pista.nome,
                   "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC}
         ret, preco, coment = self.enviar(pedido)
-        log(f"{pista.nome}: {lado} 0,01 -> retcode {ret}, preco {preco} ({coment})")
+        self.aviso(f"{pista.nome}: {lado} 0,01 -> retcode {ret}, preco {preco} ({coment})")
         self.registrar(pista, f"abre {lado}", preco_sim, preco, ret, coment)
 
     def fechar(self, pista, posicao, motivo: str, preco_sim) -> None:
         if not self.valendo:
             self.virtual[pista.nome] = None
-            log(f"[simulacao] {pista.nome}: zera a ~{preco_sim} ({motivo})")
+            self.aviso(f"[simulacao] {pista.nome}: zera a ~{preco_sim} ({motivo})")
             self.registrar(pista, "zera", preco_sim, "", "", motivo)
             return
         tick = mt5.symbol_info_tick(pista.mercado)
@@ -203,7 +222,7 @@ class Robo:
                   "deviation": 30, "magic": MAGIC[pista.nome], "comment": f"{pista.nome} {motivo}"[:30],
                   "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC}
         ret, preco, coment = self.enviar(pedido)
-        log(f"{pista.nome}: zera ({motivo}) -> retcode {ret}, preco {preco}")
+        self.aviso(f"{pista.nome}: zera ({motivo}) -> retcode {ret}, preco {preco}")
         self.registrar(pista, "zera", preco_sim, preco, ret, motivo)
 
     def mover_stop(self, pista, posicao, novo_sl: float) -> None:
@@ -213,7 +232,7 @@ class Robo:
             return
         r = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "symbol": pista.mercado,
                             "position": posicao.ticket, "sl": novo_sl, "tp": posicao.tp})
-        log(f"{pista.nome}: stop para {novo_sl} (0x0) -> retcode {getattr(r, 'retcode', None)}")
+        self.aviso(f"{pista.nome}: stop para {novo_sl} (0x0) -> retcode {getattr(r, 'retcode', None)}")
         self.registrar(pista, "stop no 0x0", None, novo_sl, getattr(r, "retcode", None), "")
 
     # ------------------------------------------------------------ alinhar
@@ -237,7 +256,7 @@ class Robo:
                 self.salvar_estado()
             elif chave not in self.estado["entradas"]:
                 desde = pd.Timestamp(desejado["t"]) - self.offset + pd.Timedelta(minutes=TFS[pista.tf])
-                log(f"{pista.nome}: a estrategia esta posicionada desde {desde:%d/%m %H:%M} (servidor), "
+                self.aviso(f"{pista.nome}: a estrategia esta posicionada desde {desde:%d/%m %H:%M} (servidor), "
                     f"mas a entrada ja passou - nao entra atrasado.")
                 self.estado["entradas"][chave] = "perdida"
                 self.salvar_estado()
@@ -266,35 +285,66 @@ class Robo:
             return
         if (agora.hour, agora.minute) >= FECHAR_AS:
             if self.fechou_dia != hoje:
+                self.avisos = []
                 self.zerar_tudo("fim do dia")
                 self.fechou_dia = hoje
+                self.imprimir_bloco(agora, ["fim do dia: tudo zerado, o robo volta na abertura de amanha"])
             return
 
-        dados, status, houve_vela = {}, [], False
-        for pista in PISTAS:
-            if pista.mercado not in dados:
-                dados[pista.mercado] = self.m1_recente(pista.mercado)
-            desejado, ultima, preco = self.avaliar(pista, dados[pista.mercado], agora)
-            if ultima is not None and self.ultima_barra.get(pista.nome) != ultima:
-                houve_vela = True
-                self.ultima_barra[pista.nome] = ultima
-                self.alinhar(pista, desejado, ultima, preco)
-            # Depois de alinhar, para o status mostrar o que o robo tem AGORA.
-            status.append(self.descrever(pista, desejado, preco))
-        if houve_vela:
-            log(f"status {agora:%H:%M} servidor | " + " | ".join(status))
+        dados, linhas, houve_vela = {}, [], False
+        self.avisos = []
+        try:
+            for pista in PISTAS:
+                if pista.mercado not in dados:
+                    dados[pista.mercado] = self.m1_recente(pista.mercado)
+                desejado, ultima, preco = self.avaliar(pista, dados[pista.mercado], agora)
+                if ultima is not None and self.ultima_barra.get(pista.nome) != ultima:
+                    houve_vela = True
+                    self.ultima_barra[pista.nome] = ultima
+                    self.alinhar(pista, desejado, ultima, preco)
+                # Depois de alinhar, para mostrar o que o robo tem AGORA.
+                linhas.append(f"{pista.nome:<10}{DESCRICAO[pista.nome]}  "
+                              f"{self.descrever(pista, desejado, preco, ultima, agora)}")
+            if houve_vela or self.avisos:
+                self.imprimir_bloco(agora, linhas)
+        finally:
+            self.avisos = None
 
-    def descrever(self, pista, desejado, preco) -> str:
-        """Uma linha curta: o que a estrategia manda e o que o robo tem."""
-        if pista.nome == "P1-A" and self.agora_servidor("XAUUSD").weekday() > 2:
-            return f"{pista.nome}: fora (so opera dom-qua)"
-        tem = "com posicao" if self.posicoes(pista) else "sem posicao"
+    def imprimir_bloco(self, agora: datetime, linhas: list[str]) -> None:
+        """Um bloco por vela: horario, uma linha por grafico, e as acoes embaixo."""
+        modo = "DEMO VALENDO" if self.valendo else "simulacao"
+        cab = f" {agora:%H:%M} servidor | {datetime.now():%H:%M} Brasilia | {modo} "
+        bloco = ["", cab.center(96, "=")] + [f"  {x}" for x in linhas]
+        if self.avisos:
+            bloco += ["  " + "-" * 92] + [f"  >> {a}" for a in self.avisos]
+        escrever(bloco)
+
+    def descrever(self, pista, desejado, preco, ultima, agora: datetime) -> str:
+        """O que a estrategia manda agora e o que o robo tem, em uma linha."""
+        if pista.nome == "P1-A" and agora.weekday() > 2:
+            return "fora hoje (so opera de domingo a quarta)"
+        canal = ""
+        if pista.tipo == "grade":
+            c = self.canal_do_dia.get(pista.nome)
+            if ultima is None or c is None or c[0] != ultima.date():
+                return "aguardando a abertura de NY (16:30 servidor)"
+            canal = f"canal {c[1]:.2f}-{c[1] + c[2]:.2f} | "
+        tem_robo = bool(self.posicoes(pista))
         if desejado is None:
-            return f"{pista.nome}: estrategia fora, robo {tem}"
-        lado = "comprada" if desejado["dir"] > 0 else "vendida"
+            return canal + ("sem posicao" if not tem_robo else "sem sinal, mas o robo AINDA tem posicao")
+        dig = mt5.symbol_info(pista.mercado).digits
+        lado = "COMPRADO" if desejado["dir"] > 0 else "VENDIDO "
         # Entrada no FECHAMENTO da vela do sinal: inicio da vela + tempo grafico.
         desde = pd.Timestamp(desejado["t"]) - self.offset + pd.Timedelta(minutes=TFS[pista.tf])
-        return f"{pista.nome}: estrategia {lado} desde {desde:%H:%M}, robo {tem}"
+        risco = desejado.get("risco") or abs(desejado["entrada"] - desejado.get("stop0", desejado["stop"]))
+        r = (preco - desejado["entrada"]) * desejado["dir"] / risco if risco else 0.0
+        texto = (f"{canal}{lado} desde {desde:%H:%M} a {desejado['entrada']:.{dig}f} | "
+                 f"agora {preco:.{dig}f} | {r:+.2f}R")
+        if desejado.get("be"):
+            texto += " | stop no 0x0"
+        if not tem_robo:
+            texto += " | robo fora"
+        return texto
 
     def rodar(self) -> None:
         self.checar_conta()
