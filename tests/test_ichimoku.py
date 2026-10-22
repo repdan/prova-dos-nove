@@ -49,6 +49,15 @@ def test_espelho_sai_junto_com_o_original():
     assert np.allclose(a["resultado_bruto"], -b["resultado_bruto"])
 
 
+def test_saida_na_reentrada_sai_antes_da_raiz():
+    """Mesma serie: a saida na reentrada fecha a compra antes (e mais cara) que o classico."""
+    fech = [100.0] * 10 + [101, 103, 106, 110, 114, 118, 120, 119, 112, 104, 98, 94, 92, 91, 90]
+    classico = simular_ichimoku(serie(fech), P, SEM)
+    reent = simular_ichimoku(serie(fech), replace(P, saida="reentrada"), SEM)
+    assert reent["motivo"].iloc[0] == "reentrou"
+    assert reent["tempo_saida"].iloc[0] <= classico["tempo_saida"].iloc[0]
+
+
 def test_fecha_no_fim_do_dia():
     fech = [100.0] * 10 + [101, 103, 106, 110, 114, 118, 120]
     dia = [0] * 14 + [1] * 3

@@ -41,7 +41,10 @@ class ParametrosIchimoku:
     # Nuvem fina ("estreitamento"): so entra se a espessura da nuvem for menor
     # que nuvem_fina x amplitude media das ultimas 14 velas. None = sem filtro.
     nuvem_fina: float | None = None
-    saida: str = "nuvem"            # "nuvem" | "grade"
+    # "nuvem": sai ao fechar alem do OUTRO lado da nuvem (classico, vira a mao).
+    # "reentrada": sai assim que fecha de volta DENTRO da nuvem.
+    # "grade": alvo pelo canal das ultimas velas, 0x0, stop no outro lado.
+    saida: str = "nuvem"
     take_niveis: float = 1.0
     canal_velas: int = 4
     usar_0x0: bool = True
@@ -118,6 +121,11 @@ def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
                 s = pos["sinal"]
                 if (f[i] < inf[i]) if s > 0 else (f[i] > sup[i]):
                     fechar(i, f[i], "nuvem")
+            elif p.saida == "reentrada":
+                # Voltou para dentro da nuvem (ou atravessou): sai.
+                s = pos["sinal"]
+                if (f[i] <= sup[i]) if s > 0 else (f[i] >= inf[i]):
+                    fechar(i, f[i], "reentrou")
             elif pos["be"] and ((mn[i] <= pos["entrada"]) if d > 0 else (mx[i] >= pos["entrada"])):
                 fechar(i, pos["entrada"], "0x0")
             elif not pos["be"] and ((f[i] < pos["stop"]) if d > 0 else (f[i] > pos["stop"])):

@@ -1,0 +1,32 @@
+﻿
+  ouro M15
+  saida                           periodo          trades  acerto       sem custo         ESPELHO       com custo  dur. med
+  -----------------------------------------------------------------------------------------------------------------------
+  classico (outro lado, vira a mao)   completo           6497     26%  -0.082R  -2.3s  +0.082R  +2.3s  -0.160R  -4.5s     3.5 h
+  classico (outro lado, vira a mao)   2022 em diante     3712     29%  +0.077R  +1.7s  -0.077R  -1.7s  +0.014R  +0.3s     3.5 h
+  reentrada na nuvem              completo          10423     20%  -0.044R  -2.3s  +0.044R  +2.3s  -0.118R  -6.0s     1.0 h
+  reentrada na nuvem              2022 em diante     5917     23%  +0.048R  +1.9s  -0.048R  -1.9s  -0.011R  -0.4s     1.0 h
+
+  ouro H1
+  saida                           periodo          trades  acerto       sem custo         ESPELHO       com custo  dur. med
+  -----------------------------------------------------------------------------------------------------------------------
+  classico (outro lado, vira a mao)   completo           1838     38%  +0.017R  +0.4s  -0.017R  -0.4s  -0.019R  -0.4s     7.0 h
+  classico (outro lado, vira a mao)   2022 em diante     1015     42%  +0.036R  +0.7s  -0.036R  -0.7s  +0.010R  +0.2s     7.0 h
+  reentrada na nuvem              completo           2435     29%  +0.013R  +0.4s  -0.013R  -0.4s  -0.023R  -0.7s     3.0 h
+  reentrada na nuvem              2022 em diante     1347     33%  +0.041R  +1.2s  -0.041R  -1.2s  +0.015R  +0.5s     3.0 h
+
+  USDJPY M15
+  saida                           periodo          trades  acerto       sem custo         ESPELHO       com custo  dur. med
+  -----------------------------------------------------------------------------------------------------------------------
+  classico (outro lado, vira a mao)   completo           9171     27%  -0.176R  -6.7s  +0.176R  +6.7s  -0.306R -11.6s     3.8 h
+  classico (outro lado, vira a mao)   2022 em diante     3646     30%  +0.151R  +2.8s  -0.151R  -2.8s  +0.107R  +2.0s     4.0 h
+  reentrada na nuvem              completo          14958     20%  -0.089R  -5.8s  +0.089R  +5.8s  -0.213R -13.9s     1.0 h
+  reentrada na nuvem              2022 em diante     5946     23%  +0.098R  +3.0s  -0.098R  -3.0s  +0.059R  +1.8s     1.0 h
+
+  USDJPY H1
+  saida                           periodo          trades  acerto       sem custo         ESPELHO       com custo  dur. med
+  -----------------------------------------------------------------------------------------------------------------------
+  classico (outro lado, vira a mao)   completo           2393     39%  -0.001R  -0.0s  +0.001R  +0.0s  -0.058R  -1.9s     7.0 h
+  classico (outro lado, vira a mao)   2022 em diante      983     44%  +0.099R  +1.9s  -0.099R  -1.9s  +0.084R  +1.6s     8.0 h
+  reentrada na nuvem              completo           3237     30%  -0.002R  -0.1s  +0.002R  +0.1s  -0.058R  -2.7s     3.0 h
+  reentrada na nuvem              2022 em diante     1322     34%  +0.071R  +1.9s  -0.071R  -1.9s  +0.056R  +1.5s     3.0 h
