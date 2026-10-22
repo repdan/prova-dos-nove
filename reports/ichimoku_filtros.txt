@@ -1,0 +1,20 @@
+﻿
+  DESCOBERTA 2022-2024, com custo (trades >=5R: com filtro / sem filtro)
+  filtro                                    mercado   trades  R/trade   R/ano  trades >=5R
+  ----------------------------------------------------------------------------------------
+  sem filtro                                ouro        2399   -0.039   -30.9          111
+  sem filtro                                USDJPY      2319   +0.051   +40.1          107
+  F1 tendencia H1                           ouro        1015   +0.002    +0.8       50/111
+  F1 tendencia H1                           USDJPY      1035   +0.001    +0.3       41/107
+  F2 tenkan x kijun                         ouro        1394   +0.046   +21.4       76/111
+  F2 tenkan x kijun                         USDJPY      1434   +0.027   +13.3       69/107
+  F3 chikou                                 ouro        1990   -0.050   -33.4       89/111
+  F3 chikou                                 USDJPY      1888   +0.056   +35.5       97/107
+  F4 horario 10-20                          ouro        1499   +0.004    +1.9       71/111
+  F4 horario 10-20                          USDJPY      1266   +0.042   +17.9       47/107
+  F5 volatilidade                           ouro        1469   -0.101   -49.6       51/111
+  F5 volatilidade                           USDJPY      1271   -0.033   -14.0       34/107
+  F6 cor da nuvem                           ouro        1437   -0.014    -6.9       63/111
+  F6 cor da nuvem                           USDJPY      1424   +0.015    +7.3       56/107
+
+  Aprovados pelo protocolo: nenhum

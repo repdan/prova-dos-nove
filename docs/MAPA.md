@@ -51,6 +51,7 @@ entradas no sentido oposto (controle).
 | Canal semanal (montado na segunda) | Não melhora o diário | — | `analises/grade_canal_semanal.py` |
 | Ichimoku de referencia (classico e adaptaçãa grade) | Sem resultado líquido no período completo | — | `analises/ichimoku_referencia.py` |
 | Ichimoku: sair na reentrada da nuvem | Pior que o classico (corta os ganhos grandes) | — | `analises/ichimoku_saida_reentrada.py` |
+| Ichimoku: 6 filtros de entrada (protocolo registrado antes) | Nenhum aprovado: o que ajuda o ouro atrapalha o USDJPY; filtros cortam os trades grandes na mesma proporção | — | `analises/ichimoku_filtros.py` |
 
 ## 3. Armadilhas dos dados
 
