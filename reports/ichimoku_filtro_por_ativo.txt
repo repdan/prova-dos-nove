@@ -1,0 +1,16 @@
+﻿
+  1) HIPOTESE: ouro com F2, USDJPY sem filtro - teste em 2025-2026 (com custo)
+    ouro    sem filtro              1313 trades  +0.110 R/trade    +80.5 R/ano
+    ouro    F2 tenkan x kijun        803 trades  +0.015 R/trade     +6.5 R/ano
+    USDJPY  sem filtro              1327 trades  +0.205 R/trade   +153.5 R/ano
+
+  2) PROCEDIMENTO 'melhor filtro por ativo': escolhe no 1o periodo, mede no 2o (com custo, R/ano)
+    ativo   escolhido no passado      no passado  sem filtro | depois:  escolhido  sem filtro  venceu?
+    ouro    F2 tenkan x kijun              +21.4       -30.9                 +6.5       +80.5  nao
+    USDJPY  (nenhum)                       +40.1       +40.1               +153.5      +153.5  igual
+    GBPUSD  F1 tendencia H1                -18.2      -107.1                -52.3       -76.4  sim
+    AUDUSD  F4 horario 10-20               -43.1      -135.8                -46.8       -72.5  sim
+    USDCAD  F2 tenkan x kijun              -71.1      -153.6                 +4.6       -50.2  sim
+    EURUSD  F2 tenkan x kijun              -24.2      -129.4                +28.7       +52.6  nao
+
+    O filtro escolhido no passado venceu o 'sem filtro' depois em 3 de 6 ativos.

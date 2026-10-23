@@ -76,9 +76,12 @@ DESCRICAO = {"P1-A": "ouro    M15  Grade ", "P1-B": "ouro    M30  Grade ",
 class Robo:
     def __init__(self, valendo: bool):
         self.valendo = valendo
-        self.virtual: dict[str, dict | None] = {p.nome: None for p in PISTAS}  # so na simulacao
         self.ultima_barra: dict[str, pd.Timestamp] = {}
         self.estado = json.loads(ESTADO.read_text()) if ESTADO.exists() else {"entradas": {}}
+        # Posicoes da simulacao: ficam no estado.json para sobreviver a um reinicio.
+        self.virtual: dict[str, dict | None] = self.estado.setdefault("virtual", {})
+        for p in PISTAS:
+            self.virtual.setdefault(p.nome, None)
         self.dia_corrente, self.patrimonio_inicio_dia, self.pausado_ate = None, None, None
         self.fechou_dia: str | None = None
         self.offset = pd.Timedelta(0)     # relogio da estrategia - relogio do servidor
@@ -195,6 +198,7 @@ class Robo:
         lado = "COMPRA" if d > 0 else "VENDA"
         if not self.valendo:
             self.virtual[pista.nome] = {"dir": d, "t": desejado["t"]}
+            self.salvar_estado()
             self.aviso(f"[simulacao] {pista.nome}: {lado} 0,01 a ~{preco_sim} (stop de protecao {sl}, alvo {tp or '-'})")
             self.registrar(pista, f"abre {lado}", preco_sim, "", "", f"sl {sl} tp {tp}")
             return
@@ -211,6 +215,7 @@ class Robo:
     def fechar(self, pista, posicao, motivo: str, preco_sim) -> None:
         if not self.valendo:
             self.virtual[pista.nome] = None
+            self.salvar_estado()
             self.aviso(f"[simulacao] {pista.nome}: zera a ~{preco_sim} ({motivo})")
             self.registrar(pista, "zera", preco_sim, "", "", motivo)
             return
@@ -267,7 +272,8 @@ class Robo:
     def zerar_tudo(self, motivo: str) -> None:
         for pista in PISTAS:
             for pos in self.posicoes(pista):
-                self.fechar(pista, pos, motivo, None)
+                tick = mt5.symbol_info_tick(pista.mercado)
+                self.fechar(pista, pos, motivo, round((tick.bid + tick.ask) / 2, 5))
 
     # --------------------------------------------------------------- ciclo
     def ciclo(self) -> None:

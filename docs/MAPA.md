@@ -52,6 +52,7 @@ entradas no sentido oposto (controle).
 | Ichimoku de referencia (classico e adaptaçãa grade) | Sem resultado líquido no período completo | — | `analises/ichimoku_referencia.py` |
 | Ichimoku: sair na reentrada da nuvem | Pior que o classico (corta os ganhos grandes) | — | `analises/ichimoku_saida_reentrada.py` |
 | Ichimoku: 6 filtros de entrada (protocolo registrado antes) | Nenhum aprovado: o que ajuda o ouro atrapalha o USDJPY; filtros cortam os trades grandes na mesma proporção | — | `analises/ichimoku_filtros.py` |
+| Ichimoku: melhor filtro escolhido por ativo (ouro com F2, USDJPY sem) | Ouro com F2 em 2025–26: +6,5 R/ano contra +80,5 sem filtro. Escolher por ativo acertou 3 de 6 (cara ou coroa); onde "acertou", o método sem filtro perdia e o filtro só reduziu o número de trades | — | `analises/ichimoku_filtro_por_ativo.py` |
 
 ## 3. Armadilhas dos dados
 
