@@ -54,6 +54,10 @@ class ParametrosIchimoku:
     # nuvem fina, "o outro lado da nuvem" pode ficar a uma fracao de pip da
     # entrada - risco ~0, e qualquer movimento vira milhares de R.
     risco_minimo_amp: float = 1.0
+    # Pausa depois de um trade grande: se um trade fecha com >= pausa_apos_r R,
+    # os proximos pausa_sinais sinais que virariam entrada sao ignorados.
+    pausa_apos_r: float | None = None
+    pausa_sinais: int = 0
 
 
 def nuvem(df: pd.DataFrame, p: ParametrosIchimoku) -> tuple[np.ndarray, np.ndarray]:
@@ -97,21 +101,25 @@ def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
 
     trades, pos = [], None
     lado_fora = 0        # ultimo lado em que o preco fechou FORA da nuvem
+    pular = 0            # sinais que ainda serao ignorados (pausa)
 
     def ponta(i):
         return spreads[i] / 2 + custos.slippage
 
     def fechar(i, preco, motivo):
-        nonlocal pos
+        nonlocal pos, pular
         d = pos["dir"]
         bruto = (preco - pos["entrada"]) * d
         custo = pos["c0"] + ponta(i) + custos.comissao_pontos
+        r = (bruto - custo) / pos["risco"]
         trades.append({"dia": dia[i], "direcao": d, "tipo": pos["tipo"],
                        "tempo_entrada": pos["t"], "tempo_saida": t[i],
                        "preco_entrada": pos["entrada"], "preco_saida": preco,
                        "motivo": motivo, "custo": custo, "resultado_bruto": bruto,
                        "resultado": bruto - custo, "risco": pos["risco"],
-                       "largura": pos["w"], "r": (bruto - custo) / pos["risco"]})
+                       "largura": pos["w"], "r": r})
+        if p.pausa_apos_r is not None and r >= p.pausa_apos_r:
+            pular = p.pausa_sinais
         pos = None
 
     for i in range(1, len(df)):
@@ -170,6 +178,9 @@ def simular_ichimoku(df: pd.DataFrame, p: ParametrosIchimoku, custos: Custos,
         k = p.canal_velas
         w = float(mx[max(0, i - k + 1):i + 1].max() - mn[max(0, i - k + 1):i + 1].min())
         if risco <= 0 or w <= 0:
+            continue
+        if pular > 0:
+            pular -= 1
             continue
         d = -sinal if p.controle_inverter else sinal
         stop = entrada - d * risco

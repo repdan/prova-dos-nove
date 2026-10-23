@@ -63,3 +63,16 @@ def test_fecha_no_fim_do_dia():
     dia = [0] * 14 + [1] * 3
     t = simular_ichimoku(serie(fech, dia), P, SEM)
     assert "fim_do_dia" in set(t["motivo"])
+
+
+def test_pausa_depois_de_trade_grande_ignora_o_proximo_sinal():
+    """Com gatilho em qualquer resultado e N=1, nunca vira a mao na vela da saida."""
+    rng = np.random.default_rng(7)
+    fech = list(100 + np.cumsum(rng.normal(0, 1, 600)))
+    base = simular_ichimoku(serie(fech), P, SEM)
+    pausa = simular_ichimoku(serie(fech), replace(P, pausa_apos_r=-1e9, pausa_sinais=1), SEM)
+    assert (base["tempo_entrada"].iloc[1:].to_numpy() == base["tempo_saida"].iloc[:-1].to_numpy()).any()
+    assert (pausa["tempo_entrada"].iloc[1:].to_numpy() > pausa["tempo_saida"].iloc[:-1].to_numpy()).all()
+    assert 0 < len(pausa) < len(base)
+    alto = simular_ichimoku(serie(fech), replace(P, pausa_apos_r=1e9, pausa_sinais=3), SEM)
+    pd.testing.assert_frame_equal(alto, base)
