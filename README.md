@@ -1,264 +1,110 @@
-# HK50 Bot — Backtest e Otimização de Estratégia de Rompimento de Canal
+# Prova dos nove
 
-Projeto de **backtest e pesquisa**, sem execução ao vivo. Roda 100% offline sobre
-dados históricos puxados do MetaTrader 5.
+Toda ideia passa pela prova antes de valer. Laboratório para testar estratégias de trading com rigor: backtest com custo
+real, controle espelho, protocolos registrados antes do teste e validação fora
+da amostra. Inclui acompanhamento de pistas congeladas e um robô para
+MetaTrader 5 que opera só em conta demo.
 
-- **Ativo:** HK50 (índice Hang Seng) — corretora corretora, plataforma MT5
-- **Timeframe prioritário:** M15 (M5 coletado em paralelo, backtestado depois)
-- **Sessão:** apenas pregão regular de Hong Kong — 09:15–12:00 e 13:00–16:30 (UTC+8)
+> **Aviso.** Projeto de estudo, não recomendação de investimento. Até aqui,
+> **nenhuma estratégia sobreviveu** a custo real e teste fora da amostra. O robô
+> recusa conta real e tem o lote travado no mínimo.
 
 ---
 
-## Instalação
+## O que já foi testado
+
+Rompimento de canal, reversão à média, trend following em carteira, a grade de
+níveis (HK50, ouro, índices) e o Ichimoku, com dezenas de variações de gestão,
+canal, tempo gráfico e filtro de entrada. O padrão que se repete:
+
+- o sinal bruto fica entre 0 e 0,05 R por trade;
+- o custo come de 0,02 R (H1) a 0,17 R (M1) por trade;
+- acerto alto costuma vir da geometria stop/alvo: o espelho (as mesmas entradas
+  no sentido oposto) acerta igual.
+
+A tabela completa, com veredito e o script de cada teste, está em
+[`docs/MAPA.md`](docs/MAPA.md). **Comece por ela.**
+
+## Método
+
+Cada ideia passa pelas mesmas etapas antes de valer alguma coisa:
+
+1. **Custo real**: spread, deslize, comissão e swap medidos na corretora.
+2. **Espelho**: se as entradas invertidas também ganham, o mérito é da
+   geometria stop/alvo, não da entrada.
+3. **Protocolo antes do teste**: regra, parâmetros e critério de aprovação ficam
+   num arquivo commitado antes de rodar (ex.:
+   [`analises/ichimoku_filtros_protocolo.md`](analises/ichimoku_filtros_protocolo.md)).
+4. **Fora da amostra**: escolhe num período e mede noutro, ou em outros mercados.
+5. **Congelar**: o que sobra vira uma pista com regras fixas e passa a ser
+   acompanhada contra o esperado do backtest. Ideia nova vira pista nova, nunca
+   ajuste de uma antiga.
+
+## Estrutura
+
+| Pasta | Conteúdo |
+|---|---|
+| `strategy/` | Estratégias: `grade.py`, `grade_gap.py`, `ichimoku.py` (com modo ao vivo) e as antigas |
+| `backtest/` | Motores antigos (intradiário HK50, carteira diária) |
+| `analises/` | Um script por teste, coletores de dados e protocolos; saída em `reports/*.txt` |
+| `acompanhamento/` | Pistas congeladas, regras e placar contra o esperado |
+| `execucao/` | Robô da conta demo ([`LEIA.md`](execucao/LEIA.md)) |
+| `atalhos/` | Atalhos `.bat` de duplo clique ([`COMANDOS.md`](atalhos/COMANDOS.md)) |
+| `tests/` | Testes; `test_ao_vivo.py` garante que o robô decide igual ao backtest, vela a vela |
+
+## Como rodar
+
+**Requisitos:** Windows, Python 3.12 do python.org (o da Microsoft Store
+conflita com a biblioteca `MetaTrader5`) e o terminal MetaTrader 5 aberto e
+logado. O login é feito no terminal; o projeto nunca lida com senha.
 
 ```bash
-cd C:\dev\hk50-bot
+python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-O ambiente virtual já está criado com Python 3.12.10 oficial (python.org).
-Não use o Python da Microsoft Store: ele roda em sandbox e conflita com a
-biblioteca MetaTrader5.
+Os testes usam velas sintéticas. Os poucos que precisam de dados reais são
+pulados quando os dados não existem.
 
-## Como rodar a Etapa 1 (coleta)
+### Dados
 
-**Antes de rodar**, no MetaTrader 5:
-
-1. Abra o terminal e **faça login** na conta.
-2. `Ferramentas > Opções > Gráficos > Máx. barras no gráfico` → **Ilimitado**.
-3. Abra o gráfico do HK50 em M15 e em M5 e **role para trás até o início** do
-   histórico (ou use `Exibir > Símbolos > HK50 > Barras > baixar`).
-   O terminal só entrega pelo Python o que ele já baixou — sem esse passo você
-   coleta poucos meses e nem percebe.
-
-Depois:
+Nenhum dado de preço vai para o git: são da corretora e pesam centenas de MB.
+Os coletores recriam tudo a partir do terminal MT5 (antes, role o gráfico até o
+início do histórico, porque o terminal só entrega o que já baixou):
 
 ```bash
-.venv\Scripts\python.exe coletar.py
+.venv\Scripts\python.exe analises\coletar_ouro_grade.py
+.venv\Scripts\python.exe analises\coletar_m1_hk50.py
+.venv\Scripts\python.exe analises\coletar_m1_dias.py US500 US100 US30
 ```
 
-Saída em `data/historico/`:
+Armadilhas conhecidas dos dados (troca de fonte da corretora em 2022, histórico
+esparso, relógio do servidor) estão no [`MAPA`](docs/MAPA.md#3-armadilhas-dos-dados).
 
-| Arquivo | Conteúdo |
-|---|---|
-| `HK50_M15_bruto.parquet` | tudo que o terminal devolveu, nada removido |
-| `HK50_M15_pregao.parquet` | **só pregão regular, limpo — é o que o backtest usa** |
-| `HK50_M15_pregao_amostra.csv` | últimas 500 linhas, para conferir a olho |
-| `metadados_coleta.json` | período coberto, fuso do servidor, spec do contrato, qualidade |
-
-## Testes
+### Um teste, o placar, o robô
 
 ```bash
-.venv\Scripts\python.exe -m pytest tests/ -q
+.venv\Scripts\python.exe -m analises.ichimoku_filtros       # um estudo
+.venv\Scripts\python.exe -m acompanhamento.acompanhar       # placar das pistas
+.venv\Scripts\python.exe -m execucao.robo_demo              # robô em simulação
+.venv\Scripts\python.exe -m execucao.robo_demo --valendo    # robô enviando ordens na DEMO
 ```
 
-Os testes usam candles sintéticos e **não precisam do MT5 aberto**. Validam
-inferência de fuso, filtro de pregão, limpeza e detecção de buracos.
+Travas do robô:
 
----
+- só roda em conta **demo**; em conta real, recusa e sai;
+- lote fixo em 0,01;
+- para no limite de perda diária;
+- zera tudo no fim do dia;
+- para com segurança ao criar um arquivo `execucao/PARAR`.
 
-## Decisões técnicas que valem explicar
+## Linha do tempo
 
-### Fuso horário do servidor é inferido, não chutado
-O MT5 devolve o horário do **servidor da corretora**, que não é UTC nem o seu
-horário local. Errar isso desloca toda a análise por horário do dia — que é
-justamente uma das saídas da Etapa 4.
+Tags no git, da mais antiga à mais nova:
 
-Em vez de pedir o número, o script testa cada offset de UTC−12 a UTC+14 e fica
-com aquele que joga a maior fração do volume negociado para dentro do pregão de
-Hong Kong. É auto-corretivo e reporta a confiança da escolha.
-
-### Buraco de dado ≠ mercado fechado
-Cada candle é marcado com a sessão a que pertence (`sessao_id`). Só conta como
-buraco a ausência de candles **dentro do mesmo bloco contínuo** (mesmo dia,
-mesma sessão). A pausa do almoço e a virada de dia são troca de bloco, não falha
-de download. Isso funciona para qualquer timeframe sem ajuste.
-
-### Nada é apagado em silêncio
-Toda linha removida vai para o relatório de qualidade com o motivo, e o arquivo
-`_bruto` guarda o original intacto.
-
----
-
-## Estado das etapas
-
-| Etapa | Status |
-|---|---|
-| 1 — Coleta e tratamento de dados | ✅ **concluída** — dados coletados e validados |
-| 2 — Estratégia de canal (plugin) | ✅ **concluída** — 23 testes, validada nos dados reais |
-| 3 — Engine de backtest event-driven | ✅ **concluída** — 36 testes, baseline medido |
-| 4 — Camada de machine learning | ⬜ não iniciada |
-| 5 — Relatório final | ⬜ não iniciada |
-
----
-
-## Estado: HK50 congelado, projeto migrando para mercado contínuo
-
-O trabalho no HK50 está **completo e preservado** na tag `hk50-final`. Ele
-continua rodando: `git checkout hk50-final` reproduz tudo.
-
-**Por que migramos.** A métrica que decide se esta estratégia sobrevive num
-instrumento é quanto de um candle típico o custo de um giro consome. Medido
-nos 304 símbolos líquidos da corretora:
-
-| Instrumento | Giro ÷ ATR (hoje) | Posição |
-|---|---|---|
-| EURUSD | ~0,0% | 1º |
-| GER40 | 0,7% | 2º |
-| XAUUSD | 2,1% | 4º |
-| **HK50** | **22,0%** | **151º de 304** |
-
-Um giro no HK50 em M15 consome quase um quarto de um candle inteiro. A
-estratégia não estava errada — o terreno era hostil. O melhor resultado que
-conseguimos lá (fator 1,15, Sharpe 0,81) foi obtido no instrumento errado.
-
-**Fica registrado para o futuro:** o HK50 tem volume alto e movimento rápido.
-Ele pode servir a uma estratégia de scalping com custo por trade muito menor,
-ou a uma que opere menos vezes e capture movimentos maiores. Não é o ativo,
-é a combinação ativo + estratégia + timeframe.
-
----
-
-## O que a Etapa 1 encontrou (execução de 02/09/2026)
-
-**Símbolo:** `HK50` — Hong Kong 50 Index · servidor `Corretora-Demo` · conta DEMO
-
-| Timeframe | Período utilizável | Pregões | Candles | Buracos |
-|---|---|---|---|---|
-| **M15** (prioritário) | 2022-02-16 → 2026-09-02 (4,54 anos) | 1.115 | 27.099 | 0 |
-| M5 (só para intrabar) | 2024-07-10 → 2026-09-02 (2,14 anos) | 527 | 38.320 | 1 |
-
-### O servidor da corretora muda de fuso no horário de verão
-
-Medido: o pregão abre às **03:15 no inverno e 04:15 no verão**, hora do servidor —
-ou seja, EET/EEST (UTC+2 / UTC+3). Um offset fixo em horas acertaria metade do ano
-e erraria a outra metade em 60 minutos, **sem dar erro nenhum** — só entregaria uma
-análise de "melhor horário do dia" embaralhada.
-
-Por isso o config guarda um **nome de fuso** (`Europe/Athens`), nunca um número.
-A conversão acompanha as viradas sozinha, e há um teste que falha se alguém trocar
-por um offset fixo.
-
-### Sessão confirmada pelos dados
-
-O pregão configurado (09:15–12:00 e 13:00–16:30 HK) foi **confirmado**, não assumido:
-o último tick antes da pausa cai às 11:59:59 de Hong Kong, no minuto exato.
-
-| Sessão | Hong Kong | Brasília |
-|---|---|---|
-| Manhã | 09:15–12:00 | 22:15–01:00 |
-| Tarde | 13:00–16:30 | 02:00–05:30 |
-| _After-hours (excluído)_ | _17:15–03:00_ | _06:15–16:00_ |
-
-O pico de volume é às **09:30 HK (22:30 de Brasília)**. O after-hours tem 5 a 10× menos
-volume e spread mais largo — excluí-lo é o que o filtro de sessão faz.
-
-### Custos reais medidos
-
-| Item | Valor | Origem |
-|---|---|---|
-| Spread mediano | **4,5 pontos de índice** | mediana de 60.000 candles M15 no pregão |
-| Spread fora do pregão | ~5,0 pontos | mesma medição |
-| Valor do ponto | **0,1275 USD** por ponto de índice, por lote | `order_calc_profit` do MT5 |
-| Margem | ~80 USD por lote | `order_calc_margin` |
-| Comissão | ⚠️ **pendente** | não vem pela API |
-
-### Dados descartados, e por quê
-
-Antes de fevereiro/2022 o terminal entrega ~7 candles por dia em vez de 25 — barras
-residuais, não pregão. Passam por qualquer validação individual (OHLC coerente,
-volume positivo) e ainda assim inventariam rompimentos que nunca existiram.
-Descartadas por dois filtros independentes que concordam entre si: densidade mínima
-diária (35% da mediana) e corte explícito de data.
-
-**M1 e M5 param em exatos 100.000 candles** — teto do terminal, não do servidor.
-Só o M15 (77.365) fica abaixo do teto e por isso alcança mais anos.
-
----
-
-## Fora de escopo nesta fase (Fase 2)
-
-Registrado aqui para não se perder:
-
-- **Gestão de risco de 2% do capital por dia** e **position sizing real.**
-  O backtest usa lote fixo (`estrategia.lote`, padrão 0.1). Não há capital real
-  definido na simulação, então limite diário e cálculo de lote como % do capital
-  ficam para quando entrar dinheiro de verdade.
-- **Execução ao vivo.** As interfaces `DataFeed` e `Executor` (Etapa 3) já
-  nascem desenhadas para o encaixe futuro de `mt5.order_send()`, mas nenhuma
-  ordem é enviada neste projeto.
-
-### Aviso sobre a estratégia base: ela não tem stop loss
-
-A regra base é *stop-gain* — a posição só fecha no rompimento da média oposta.
-Isso significa que a perda de um trade é **ilimitada** até o próximo candle.
-Num gap de abertura ou evento rápido, o prejuízo pode ser muito maior do que
-qualquer trade do backtest sugere.
-
-A regra base **não será alterada** (é o baseline que o projeto quer medir), mas:
-- a engine reporta a **perda máxima por trade** como métrica de primeira classe;
-- existe um `stop_catastrofico_ativo` no config, **desligado por padrão**, para
-  medir quanto custaria ter uma rede de segurança.
-
-## Resultado do baseline (Etapa 3)
-
-**Configuração atual** — `stop_gain`, canal por média de 20, filtro de volume
-em 0,70, M15, 2022-02 a 2026-09, lote 0,01:
-
-| | Sem filtro | **Com filtro de volume** |
-|---|---|---|
-| Trades | 1.211 | **594** |
-| Acerto | 35% | **38%** |
-| Fator de lucro | 0,98 | **1,10** |
-| Pontos | −1.926 | **+5.568** |
-| Custo sobre o bruto | 108% | **56%** |
-| Sharpe | −0,10 | **0,59** |
-
-O filtro descarta o rompimento quando o candle ANTERIOR teve volume acima de
-0,70× a média dos últimos 100. Ver `analises/assinatura_lateral.py`.
-
-### Baseline original, para referência
-
-`stop_gain`, canal por média de 20, M15, 2022-02 a 2026-09, lote 0,01:
-
-| Modo de saída | Trades | Acerto | Fator de lucro | Pontos | Sharpe |
-|---|---|---|---|---|---|
-| **stop_gain** | 1.211 | 36% | **1,04** | **+3.939** | 0,24 |
-| trailing | 1.225 | 35% | 1,03 | +2.922 | 0,18 |
-| fibo_expansion | 1.529 | 49% | 0,78 | −25.926 | −2,19 |
-
-**O custo de transação consumiu 69% do lucro bruto** (12.781 brutos → 3.939
-líquidos), e a comissão ainda está em zero. É o número mais importante do
-projeto até aqui.
-
-### Onde o dinheiro é feito e perdido
-
-| Regime do dia (direcionalidade) | Trades | Pontos | Acerto |
-|---|---|---|---|
-| 0–25% — lateral | 400 | **−22.797** | 24% |
-| 25–50% | 375 | −405 | 35% |
-| 50–75% | 324 | +15.098 | 44% |
-| 75–100% — tendência | 110 | **+12.306** | 54% |
-
-A hipótese do prompt original está confirmada com números: **todo o lucro vem
-de dias direcionais, e os dias laterais devolvem quase tudo.** Isolar esse
-regime é a razão de existir da Etapa 4.
-
-### Sobre o nome "Donchian"
-
-O prompt original descreve "canal tipo Donchian: duas médias móveis de 20
-períodos, uma sobre as máximas e outra sobre as mínimas". Essas são **duas
-coisas diferentes**: Donchian clássico usa o *maior* máximo e o *menor* mínimo
-da janela; o que está descrito é a *média* dos máximos e a *média* dos mínimos.
-
-Implementei o que foi descrito (média) como padrão, e o Donchian clássico como
-alternativa em `estrategia.tipo_canal`. Assim a Etapa 4 compara as duas com o
-mesmo engine, em vez de a gente escolher no escuro.
-
-### Retreino do modelo (Etapa 4)
-
-O modelo de ML **não deve ser treinado uma vez e usado para sempre** — o
-comportamento do mercado muda. Cadência recomendada: **retreino mensal**, com a
-mesma janela de walk-forward usada na validação. A validação reporta a
-performance de **cada janela de teste separadamente**, não só a média, para
-deixar visível se o modelo é consistente ou só teve sorte num período.
+1. `hk50-final`: rompimento de canal no HK50 M15. O README daquela fase tem a
+   coleta, os fusos e os custos medidos.
+2. `grade-hk50-final`: a grade de níveis no HK50.
+3. `grade-final`: Grade no ouro e nos índices.
+4. `acompanhamento-v1`: pistas congeladas e robô da demo.
