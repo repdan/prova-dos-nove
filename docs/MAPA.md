@@ -62,7 +62,8 @@ entradas no sentido oposto (controle).
   medir a corretora, não o mercado.
 - HK50 antes de 2022 e ouro em 2017–2018: histórico esparso.
 - Spread histórico do ouro é zero antes de 2019: use o spread ao vivo (0,21).
-- Arquivos de M1 não vão para o git (centenas de MB); os coletores em
+- Nenhum dado de preço vai para o git (parquet, csv, json de replay): são da
+  corretora e pesam centenas de MB. Os coletores em
   `analises/coletar_*` recriam.
 - "Dia" do ouro = bloco da corretora, 01:00–23:59 do servidor; no relógio da
   estratégia (`tempo_ativo`) fica 1 h antes.

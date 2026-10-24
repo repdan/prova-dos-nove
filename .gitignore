@@ -16,3 +16,15 @@ execucao/diario.csv
 execucao/robo.log
 execucao/estado.json
 execucao/PARAR
+
+# Dados de preco da corretora (nao redistribuir; os coletores recriam)
+*.parquet
+*.csv
+reports/*.json
+
+
+# Segredos, caso um dia existam
+.env
+*.env
+*.key
+*.pem
