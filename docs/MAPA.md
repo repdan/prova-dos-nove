@@ -82,4 +82,4 @@ entradas no sentido oposto (controle).
 | `tests/` | 100 testes; `test_ao_vivo.py` garante que o robô = backtest |
 
 Linha do tempo no git: `hk50-final` → `grade-hk50-final` → `grade-final` →
-`acompanhamento-v1` (branch `grade-hk50`).
+`acompanhamento-v1` (branch `main`).
