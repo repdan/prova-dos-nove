@@ -40,6 +40,111 @@ Cada ideia passa pelas mesmas etapas antes de valer alguma coisa:
    acompanhada contra o esperado do backtest. Ideia nova vira pista nova, nunca
    ajuste de uma antiga.
 
+## As quatro estratégias em acompanhamento
+
+São duas famílias, cada uma em dois ativos ou tempos gráficos. Elas sobraram
+como **pistas fracas**: positivas no backtest com custo, mas sem confirmação
+estatística. Por isso foram congeladas e passaram a ser acompanhadas contra o
+esperado. As regras completas estão em
+[`acompanhamento/regras_congeladas.md`](acompanhamento/regras_congeladas.md).
+
+### Família 1: Grade de níveis presa ao canal de abertura
+
+O método vira uma máquina de estados sobre uma grade:
+
+- **Canal:** topo e fundo das primeiras velas depois da abertura de Nova York.
+  A largura do canal define o espaçamento da grade, que se repete para cima e
+  para baixo.
+- **Estado:** o canal de referência é o nível onde o preço fechou; a zona
+  neutra é o nível logo atrás dele.
+- **Entradas, sempre no fechamento do candle:**
+  - continuação: o preço fecha além do canal de referência;
+  - retomada: visita a zona de recuo e volta a fechar além do meio do canal;
+  - reversão: fecha além da zona de recuo, contra a tendência.
+- **Saída:**
+  - stop do outro lado da zona de recuo;
+  - alvo a um número fixo de níveis;
+  - depois de um nível a favor, o stop vai para o preço de entrada.
+- **Gestão:** encerra o período ao bater o alvo. Depois de um stop, continua
+  operando até um limite de perdas.
+
+| Pista | Ativo | Tempo gráfico | Gestão |
+|---|---|---|---|
+| P1-A | Ouro | M15 | Semanal: opera só no começo da semana; 1 ganho ou o limite de stops encerra a semana |
+| P1-B | Ouro | M30 | Diária |
+
+### Família 2: Ichimoku clássico (só a nuvem)
+
+- **Nuvem:** a padrão do Ichimoku, projetada para a frente, calculada só com
+  dados passados.
+- **Entrada:** compra quando o candle fecha acima da nuvem, vende quando fecha
+  abaixo.
+- **Saída:** quando o preço fecha do outro lado da nuvem, e a posição já vira.
+- **Fim do dia:** não carrega posição de um dia para o outro.
+- **Risco mínimo:** o stop tem um piso proporcional à amplitude recente, para
+  que uma nuvem muito fina não gere um risco quase zero e resultados absurdos
+  em R.
+
+O perfil é o de seguir tendência: muitos stops pequenos e poucos ganhos muito
+grandes. Cerca de 5% dos trades passam de 5 R e pagam o resto.
+
+| Pista | Ativo | Tempo gráfico |
+|---|---|---|
+| P2-USDJPY | USDJPY | M15 |
+| P2-ouro | Ouro | M15 |
+
+### O placar
+
+[`acompanhamento/acompanhar.py`](acompanhamento/acompanhar.py) roda as quatro
+pistas nos dados novos e compara o resultado acumulado com uma faixa de ±2
+desvios em torno do esperado do backtest:
+
+- abaixo da faixa: a pista é descartada;
+- dentro da faixa: segue em observação;
+- acima: é acompanhada com mais atenção.
+
+Confirmar uma vantagem tão pequena leva anos de trades. O placar existe
+principalmente para **matar** cedo o que piorar além do acaso.
+
+## Como o robô roda
+
+[`execucao/robo_demo.py`](execucao/robo_demo.py) opera as quatro pistas ao
+mesmo tempo no MetaTrader 5.
+
+```
+a cada minuto
+  ├─ lê as velas de M1 recentes do MT5 e monta os candles de cada pista
+  ├─ descarta a vela ainda em formação
+  ├─ roda o MESMO simulador do backtest em modo ao vivo
+  │     → "que posição esta estratégia deveria ter agora?"
+  ├─ alinha a conta com essa resposta
+  │     abre · fecha · move o stop para a entrada · nunca entra atrasado
+  └─ imprime um bloco por vela e registra cada ação no diário
+```
+
+- **Uma única fonte de verdade:** o robô não reimplementa as regras. Ele chama
+  o mesmo código do backtest, e
+  [`tests/test_ao_vivo.py`](tests/test_ao_vivo.py) prova, vela a vela, que as
+  decisões ao vivo são idênticas às do backtest.
+- **Estado persistente:** as entradas já feitas ou perdidas ficam em
+  `estado.json`, para que um reinício não duplique nem invente posições.
+- **Stop de proteção no servidor:** cada ordem sai com um stop largo na
+  corretora, que protege a conta se o robô ou o PC cair.
+- **Diário de execução:** cada ação vai para `diario.csv` com o preço do
+  backtest, o preço executado e o spread do momento. É isso que mede o custo
+  real e o deslize.
+- **Dois modos:** simulação (padrão, não envia nada) e `--valendo` (envia ordens
+  na conta demo).
+- **Travas:**
+  - recusa conta real;
+  - lote fixo no mínimo, com recusa de qualquer volume acima;
+  - limite de perda diária;
+  - zera tudo antes do fim do dia;
+  - para com segurança ao criar um arquivo `execucao/PARAR`.
+
+Guia de uso em [`execucao/LEIA.md`](execucao/LEIA.md); atalhos de duplo clique
+em [`atalhos/COMANDOS.md`](atalhos/COMANDOS.md).
+
 ## Estrutura
 
 | Pasta | Conteúdo |
