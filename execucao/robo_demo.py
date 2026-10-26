@@ -138,13 +138,19 @@ class Robo:
         fim = pd.Timestamp(ultima.date()) + pd.Timedelta(minutes=math.floor(ultimo_min / tf) * tf)
         vivo = {"fim_previsto": fim}
         if pista.tipo == "grade":
-            self.anunciar_canal(pista, d, ultima)
+            self.anunciar_canal(pista, d, ultima, agora)
             simular(d, pista.params, pista.custos, pista.ponto, ao_vivo=vivo)
         else:
             simular_ichimoku(d, pista.params, pista.custos, pista.ponto, ao_vivo=vivo)
         return vivo["pos"], ultima, float(d["fechamento"].iloc[-1])
 
-    def anunciar_canal(self, pista, d: pd.DataFrame, ultima) -> None:
+    @staticmethod
+    def abertura_ny_local(agora: datetime) -> str:
+        """16:30 do servidor no relogio do PC (acompanha horario de verao dos dois lados)."""
+        dif = round((datetime.now() - agora).total_seconds() / 1800) * 1800
+        return f"{datetime.combine(agora.date(), datetime.min.time()) + timedelta(hours=16, minutes=30, seconds=dif):%H:%M}"
+
+    def anunciar_canal(self, pista, d: pd.DataFrame, ultima, agora: datetime) -> None:
         """Uma vez por dia: o canal e a grade da grade, para tracar no grafico."""
         chave = f"{pista.nome}|{ultima.date()}"
         if chave in self.canais_anunciados:
@@ -161,7 +167,13 @@ class Robo:
         self.canais_anunciados.add(chave)
         self.canal_do_dia[pista.nome] = (ultima.date(), base, w)
         grade = "  ".join(f"{base + k * w:.2f}" for k in range(-4, 6))
-        self.aviso(f"{pista.nome}: canal de hoje {base:.2f} a {base + w:.2f} (largura {w:.2f})")
+        # Antes da abertura de NY o ultimo canal e o do pregao anterior.
+        if ultima.date() == agora.date():
+            qual = "canal de hoje"
+        else:
+            qual = (f"canal do ultimo pregao ({ultima:%d/%m}; o de hoje sai na abertura de NY, "
+                    f"{self.abertura_ny_local(agora)} Brasilia):")
+        self.aviso(f"{pista.nome}: {qual} {base:.2f} a {base + w:.2f} (largura {w:.2f})")
         self.aviso(f"{' ' * len(pista.nome)}  niveis para tracar: {grade}")
 
     # -------------------------------------------------------------- ordens
@@ -332,8 +344,8 @@ class Robo:
         canal = ""
         if pista.tipo == "grade":
             c = self.canal_do_dia.get(pista.nome)
-            if ultima is None or c is None or c[0] != ultima.date():
-                return "aguardando a abertura de NY (16:30 servidor)"
+            if ultima is None or c is None or c[0] != ultima.date() or c[0] != agora.date():
+                return f"aguardando a abertura de NY ({self.abertura_ny_local(agora)} Brasilia)"
             canal = f"canal {c[1]:.2f}-{c[1] + c[2]:.2f} | "
         tem_robo = bool(self.posicoes(pista))
         if desejado is None:
